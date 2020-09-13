@@ -47,3 +47,10 @@ func (i *Iter) NextTagAndBody() (Bytes, bool, error) {
 	*i = (*i)[n:]
 	return Bytes(val), tagIsContainer(u64), nil
 }
+
+// BodyFromTagAndBody returns the body of the Bytes value returned by NextTagAndBody.
+func BodyFromTagAndBody(tagbody Bytes) (Bytes, error) {
+	p := Iter(tagbody)
+	body, _, err := p.Next()
+	return body, err
+}

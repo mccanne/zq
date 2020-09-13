@@ -159,9 +159,6 @@ func checkSet(typ *TypeSet, body zcode.Bytes) error {
 		return nil
 	}
 	inner := AliasedType(InnerType(typ))
-	if IsContainerType(inner) {
-		return &RecordTypeError{Name: "<set>", Type: typ.String(), Err: ErrNotPrimitive}
-	}
 	it := zcode.Iter(body)
 	var prev zcode.Bytes
 	for !it.Done() {
@@ -169,8 +166,9 @@ func checkSet(typ *TypeSet, body zcode.Bytes) error {
 		if err != nil {
 			return err
 		}
-		if container {
-			return &RecordTypeError{Name: "<set element>", Type: typ.String(), Err: ErrNotPrimitive}
+		if tagAndBody == nil {
+			err := errors.New("unset value in set body")
+			return &RecordTypeError{Name: "<set element>", Type: typ.String(), Err: err}
 		}
 		if prev != nil {
 			switch bytes.Compare(prev, tagAndBody) {

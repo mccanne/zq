@@ -258,16 +258,14 @@ the array encoded as a `uvarint`:
 #### 3.1.1.3 Set Typedef
 
 A set type is encoded as a type count followed by the type ID of the
-elements of the set, each encoded as a `uvarint`:
+elements of the set, encoded as a `uvarint`:
 ```
--------------------------
-|0x82|<ntypes>|<type-id>|
--------------------------
+----------------
+|0x82|<type-id>|
+----------------
 ```
 
-`<ntypes>` must be 1.
-
-`<type-id>` must be a primitive type ID.
+a container  primitive type ID.`<type-id>` may correspond to any valid zng type.
 
 #### 3.1.1.4 Union Typedef
 
@@ -533,7 +531,7 @@ grammar describing the textual type encodings is:
 
 <ctype> := array [ <stype> ]
          | union [ <stype-list> ]
-         | set [ <stype> ]
+         | set [ <type> ]
          | record [ <columns> ]
 
 

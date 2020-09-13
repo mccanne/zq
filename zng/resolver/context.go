@@ -516,7 +516,6 @@ func (c *Context) parseTypeList(in string) (string, []zng.Type, error) {
 
 // parseSetTypeBody parses a set type body of the form "[type]" presuming the set
 // keyword is already matched.
-// The syntax "set[type1,type2,...]" for multi-typed sets is not supported.
 func (c *Context) parseSetTypeBody(in string) (string, zng.Type, error) {
 	rest, types, err := c.parseTypeList(in)
 	if err != nil {

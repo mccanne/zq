@@ -261,17 +261,15 @@ func walkSet(typ *TypeSet, body zcode.Bytes, rv RecordVisitor) error {
 		return nil
 	}
 	inner := AliasedType(InnerType(typ))
-	if IsContainerType(inner) {
-		return &RecordTypeError{Name: "<set>", Type: typ.String(), Err: ErrNotPrimitive}
-	}
+	innerContainer := IsContainerType(inner)
 	it := zcode.Iter(body)
 	for !it.Done() {
 		body, container, err := it.Next()
 		if err != nil {
 			return err
 		}
-		if container {
-			return &RecordTypeError{Name: "<set element>", Type: typ.String(), Err: ErrNotPrimitive}
+		if container != innerContainer {
+			return &RecordTypeError{Name: "<set element>", Type: typ.String(), Err: ErrTypeMismatch}
 		}
 		if err := rv(inner, body); err != nil && err != SkipContainer {
 			return err
