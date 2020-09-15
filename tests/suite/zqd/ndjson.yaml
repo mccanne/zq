@@ -1,0 +1,20 @@
+script: |
+  source services.sh
+  zapi -h $ZQD_HOST new test
+  zapi -h $ZQD_HOST -s test post in.tzng
+  zapi -h $ZQD_HOST -s test get -e ndjson > out.ndjson
+
+inputs:
+  - name: services.sh
+    source: services.sh
+  - name: in.tzng
+    data: |
+      #0:record[a:string,b:string]
+      0:[hello;world;]
+      0:[goodnight;gracie;]
+
+outputs:
+  - name: out.ndjson
+    data: |
+      {"a":"hello","b":"world"}
+      {"a":"goodnight","b":"gracie"}
