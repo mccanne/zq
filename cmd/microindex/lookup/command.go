@@ -6,7 +6,7 @@ import (
 	"flag"
 	"strings"
 
-	"github.com/brimsec/zq/cli"
+	"github.com/brimsec/zq/cli/zq"
 	"github.com/brimsec/zq/cmd/microindex/root"
 	"github.com/brimsec/zq/microindex"
 	"github.com/brimsec/zq/pkg/iosrc"
@@ -41,7 +41,7 @@ type LookupCommand struct {
 	keys        string
 	WriterFlags zio.WriterFlags
 	closest     bool
-	output      cli.OutputFlags
+	output      zq.OutputFlags
 }
 
 func newLookupCommand(parent charm.Command, f *flag.FlagSet) (charm.Command, error) {

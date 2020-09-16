@@ -5,7 +5,7 @@ import (
 	"flag"
 	"os"
 
-	"github.com/brimsec/zq/cli"
+	"github.com/brimsec/zq/cli/zq"
 	"github.com/brimsec/zq/cmd/microindex/root"
 	"github.com/brimsec/zq/microindex"
 	"github.com/brimsec/zq/zbuf"
@@ -36,7 +36,7 @@ func init() {
 type Command struct {
 	*root.Command
 	writerFlags zio.WriterFlags
-	output      cli.OutputFlags
+	output      zq.OutputFlags
 	trailer     bool
 	section     int
 }

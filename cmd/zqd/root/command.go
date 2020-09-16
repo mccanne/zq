@@ -5,7 +5,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/brimsec/zq/cli"
+	"github.com/brimsec/zq/cli/zq"
 	"github.com/mccanne/charm"
 )
 
@@ -20,7 +20,7 @@ var Zqd = &charm.Spec{
 
 type Command struct {
 	charm.Command
-	cli cli.Flags
+	cli zq.Flags
 }
 
 func init() {

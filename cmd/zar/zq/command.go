@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/brimsec/zq/archive"
-	"github.com/brimsec/zq/cli"
+	"github.com/brimsec/zq/cli/zq"
 	"github.com/brimsec/zq/cmd/zar/root"
 	"github.com/brimsec/zq/driver"
 	"github.com/brimsec/zq/pkg/rlimit"
@@ -40,7 +40,7 @@ type Command struct {
 	root        string
 	stopErr     bool
 	writerFlags zio.WriterFlags
-	output      cli.OutputFlags
+	output      zq.OutputFlags
 }
 
 func New(parent charm.Command, f *flag.FlagSet) (charm.Command, error) {

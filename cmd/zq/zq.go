@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/brimsec/zq/ast"
-	"github.com/brimsec/zq/cli"
+	"github.com/brimsec/zq/cli/zq"
 	"github.com/brimsec/zq/driver"
 	"github.com/brimsec/zq/pkg/rlimit"
 	"github.com/brimsec/zq/pkg/s3io"
@@ -74,8 +74,8 @@ type Command struct {
 	stopErr     bool
 	readerFlags zio.ReaderFlags
 	writerFlags zio.WriterFlags
-	output      cli.OutputFlags
-	cli         cli.Flags
+	output      zq.OutputFlags
+	cli         zq.Flags
 }
 
 func New(f *flag.FlagSet) (charm.Command, error) {
@@ -115,7 +115,7 @@ func (c *Command) Run(args []string) error {
 	paths := args
 	var query ast.Proc
 	var err error
-	if cli.FileExists(paths[0]) || s3io.IsS3Path(paths[0]) {
+	if zq.FileExists(paths[0]) || s3io.IsS3Path(paths[0]) {
 		query, err = zql.ParseProc("*")
 		if err != nil {
 			return err
@@ -134,7 +134,7 @@ func (c *Command) Run(args []string) error {
 		return err
 	}
 	zctx := resolver.NewContext()
-	readers, err := cli.OpenInputs(zctx, c.readerFlags.Options(), paths, c.stopErr)
+	readers, err := zq.OpenInputs(zctx, c.readerFlags.Options(), paths, c.stopErr)
 	if err != nil {
 		return err
 	}

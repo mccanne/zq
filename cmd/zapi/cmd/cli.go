@@ -9,7 +9,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/brimsec/zq/cli"
+	"github.com/brimsec/zq/cli/zq"
 	"github.com/brimsec/zq/pkg/repl"
 	"github.com/brimsec/zq/zqd/api"
 	"github.com/kballard/go-shellquote"
@@ -70,7 +70,7 @@ type Command struct {
 	NoFancy   bool
 	ctx       *signalCtx
 	spaceID   api.SpaceID
-	cli       cli.Flags
+	cli       zq.Flags
 }
 
 func (c *Command) Context() context.Context {

@@ -3,7 +3,7 @@ package root
 import (
 	"flag"
 
-	"github.com/brimsec/zq/cli"
+	"github.com/brimsec/zq/cli/zq"
 	"github.com/mccanne/charm"
 )
 
@@ -32,7 +32,7 @@ https://github.com/brimsec/zq/blob/master/cmd/zar/README.md
 
 type Command struct {
 	charm.Command
-	cli cli.Flags
+	cli zq.Flags
 }
 
 func init() {

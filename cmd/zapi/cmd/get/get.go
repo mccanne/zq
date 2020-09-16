@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/brimsec/zq/cli"
+	"github.com/brimsec/zq/cli/zq"
 	"github.com/brimsec/zq/cmd/zapi/cmd"
 	"github.com/brimsec/zq/emitter"
 	"github.com/brimsec/zq/pkg/fs"
@@ -60,7 +60,7 @@ func init() {
 type Command struct {
 	*cmd.Command
 	writerFlags zio.WriterFlags
-	output      cli.OutputFlags
+	output      zq.OutputFlags
 	encoding    string
 	from        tsflag
 	to          tsflag
