@@ -226,7 +226,7 @@ func CoerceToString(in zng.Value) (string, bool) {
 	switch in.Type.ID() {
 	default:
 		return "", false
-	case zng.IdString, zng.IdBstring, zng.IdEnum:
+	case zng.IdString, zng.IdBstring, zng.IdEnum, zng.IdBytes:
 		return string(in.Bytes), true
 	}
 }

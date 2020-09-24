@@ -82,6 +82,7 @@ var (
 	TypeUint64   = &TypeOfUint64{}
 	TypeFloat64  = &TypeOfFloat64{}
 	TypeString   = &TypeOfString{}
+	TypeBytes    = &TypeOfBytes{}
 	TypeBstring  = &TypeOfBstring{}
 	TypeIP       = &TypeOfIP{}
 	TypePort     = &TypeOfPort{}
@@ -151,6 +152,8 @@ func LookupPrimitive(name string) Type {
 		return TypeFloat64
 	case "string":
 		return TypeString
+	case "bytes":
+		return TypeBytes
 	case "bstring":
 		return TypeBstring
 	case "ip":
@@ -191,6 +194,8 @@ func LookupPrimitiveById(id int) Type {
 		return TypeFloat64
 	case IdString:
 		return TypeString
+	case IdBytes:
+		return TypeBytes
 	case IdBstring:
 		return TypeBstring
 	case IdIP:

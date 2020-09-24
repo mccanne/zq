@@ -1,0 +1,19 @@
+script: |
+  zq -t in.tzng
+  echo ===
+  zq -t "put s=b:string" in.tzng
+
+inputs:
+  - name: in.tzng
+    data: |
+      #0:record[b:bytes]
+      0:[aGVsbG8sIHdvcmxk;]
+
+outputs:
+  - name: stdout
+    data: |
+      #0:record[b:bytes]
+      0:[aGVsbG8sIHdvcmxk;]
+      ===
+      #0:record[b:bytes,s:string]
+      0:[aGVsbG8sIHdvcmxk;hello, world;]

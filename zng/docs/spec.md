@@ -6,8 +6,7 @@
 > the zq output format is subject to change.  In this branch,
 > zq attempts to implement everything herein excepting:
 >
-> * the `bytes` type is not yet implemented,
-> * the `enum` type is not yet implemented,
+> * the `enum` type is not yet implemented, and
 > * only streams of `record` types (which may consist of any combination of
 >   other implemented types) may currently be expressed in value messages.
 >

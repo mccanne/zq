@@ -588,7 +588,7 @@ CastExpression
   }
 
 ZngType
- = ("bool" / "byte" / "int16" / "uint16" / "int32" / "uint32"
+ = ("bool" / "bytes" / "byte" / "int16" / "uint16" / "int32" / "uint32"
  / "int64" / "uint64" / "float64" / "string" / "bstring"
  / "ip" / "net" / "time" / "duration") { RETURN(TEXT) }
 

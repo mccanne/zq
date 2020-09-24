@@ -59,6 +59,13 @@ func ToNativeValue(zv zng.Value) (Value, error) {
 		}
 		return Value{zv.Type, s}, nil
 
+	case zng.IdBytes:
+		b, err := zng.DecodeBytes(zv.Bytes)
+		if err != nil {
+			return Value{}, err
+		}
+		return Value{zv.Type, b}, nil
+
 	case zng.IdBstring:
 		s, err := zng.DecodeBstring(zv.Bytes)
 		if err != nil {
@@ -155,6 +162,10 @@ func (v *Value) ToZngValue() (zng.Value, error) {
 	case zng.IdString:
 		s := v.Value.(string)
 		return zng.Value{zng.TypeString, zng.EncodeString(s)}, nil
+
+	case zng.IdBytes:
+		b := v.Value.([]byte)
+		return zng.Value{zng.TypeBytes, zng.EncodeBytes(b)}, nil
 
 	case zng.IdBstring:
 		s := v.Value.(string)

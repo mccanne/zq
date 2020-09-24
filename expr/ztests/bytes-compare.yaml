@@ -1,0 +1,14 @@
+script: |
+  zq -t "put b1=s1:bytes,b2=s2:bytes | put v1=b1<b2,v2=(b1=b2)" in.tzng
+
+inputs:
+  - name: in.tzng
+    data: |
+      #0:record[s1:string,s2:string]
+      0:[abc;def;]
+
+outputs:
+  - name: stdout
+    data: |
+      #0:record[s1:string,s2:string,b1:bytes,b2:bytes,v1:bool,v2:bool]
+      0:[abc;def;YWJj;ZGVm;T;F;]

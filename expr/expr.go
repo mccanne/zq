@@ -1,6 +1,7 @@
 package expr
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math"
@@ -345,6 +346,14 @@ func compare(lhs, rhs zngnative.Value) (bool, error) {
 		}
 		return lhs.Value.(string) == rhs.Value.(string), nil
 
+	case zng.IdBytes:
+		//XXX should we do coercion, e.g., to string?  Need to decide
+		// type semantics of comparisons etc.
+		if rhs.Type.ID() != zng.IdBytes {
+			return false, ErrIncompatibleTypes
+		}
+		return bytes.Compare(lhs.Value.([]byte), rhs.Value.([]byte)) == 0, nil
+
 	case zng.IdIP:
 		if rhs.Type.ID() != zng.IdIP {
 			return false, ErrIncompatibleTypes
@@ -575,6 +584,14 @@ func compileCompareRelative(lhsFunc, rhsFunc NativeEvaluator, operator string) (
 			} else {
 				result = 1
 			}
+
+		case zng.IdBytes:
+			if rhs.Type.ID() != zng.IdBytes {
+				return zngnative.Value{}, ErrIncompatibleTypes
+			}
+			lv := lhs.Value.([]byte)
+			rv := rhs.Value.([]byte)
+			result = bytes.Compare(lv, rv)
 		default:
 			return zngnative.Value{}, ErrIncompatibleTypes
 		}
@@ -1071,6 +1088,36 @@ func compileCast(node ast.CastExpression) (NativeEvaluator, error) {
 				return zngnative.Value{}, ErrBadCast
 			}
 			return zngnative.Value{zng.TypeTime, i * 1_000_000_000}, nil
+		}, nil
+	case "string":
+		return func(rec *zng.Record) (zngnative.Value, error) {
+			val, err := fn(rec)
+			if err != nil {
+				return zngnative.Value{}, err
+			}
+			zv, err := val.ToZngValue()
+			if err != nil {
+				return zngnative.Value{}, err
+			}
+			var s string
+			if zv.Type == zng.TypeBytes {
+				s = string(zv.Bytes)
+			} else {
+				s = zv.String()
+			}
+			return zngnative.Value{zng.TypeString, s}, nil
+		}, nil
+	case "bytes":
+		return func(rec *zng.Record) (zngnative.Value, error) {
+			val, err := fn(rec)
+			if err != nil {
+				return zngnative.Value{}, err
+			}
+			zv, err := val.ToZngValue()
+			if err != nil {
+				return zngnative.Value{}, err
+			}
+			return zngnative.Value{zng.TypeBytes, []byte(zv.Bytes)}, nil
 		}, nil
 	default:
 		return nil, fmt.Errorf("cast to %s not implemeneted", node.Type)
