@@ -89,6 +89,8 @@ var (
 	TypeNet      = &TypeOfNet{}
 	TypeTime     = &TypeOfTime{}
 	TypeDuration = &TypeOfDuration{}
+	TypeType     = &TypeOfType{}
+	TypeError    = &TypeOfError{}
 	TypeNull     = &TypeOfNull{}
 )
 
@@ -110,12 +112,11 @@ const (
 	IdBytes    = 14
 	IdString   = 15
 	IdBstring  = 16
-	IdEnum     = 17
-	IdIP       = 18
-	IdNet      = 19
-	IdType     = 20
-	IdError    = 21
-	IdNull     = 22
+	IdIP       = 17
+	IdNet      = 18
+	IdType     = 19
+	IdError    = 20
+	IdNull     = 21
 
 	IdTypeDef = 23
 )
@@ -222,6 +223,8 @@ func LookupPrimitive(name string) Type {
 		return TypeTime
 	case "duration":
 		return TypeDuration
+	case "type":
+		return TypeType
 	case "null":
 		return TypeNull
 	}
@@ -262,6 +265,8 @@ func LookupPrimitiveById(id int) Type {
 		return TypeNet
 	case IdTime:
 		return TypeTime
+	case IdType:
+		return TypeType
 	case IdDuration:
 		return TypeDuration
 	case IdNull:

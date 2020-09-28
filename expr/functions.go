@@ -68,6 +68,9 @@ var allFns = map[string]struct {
 	"Time.fromMicroseconds": {1, 1, timeFromUsec},
 	"Time.fromNanoseconds":  {1, 1, timeFromNsec},
 	"Time.trunc":            {2, 2, timeTrunc},
+
+	"typeof": {1, 1, typeOf},
+	"iserr":  {1, 1, isErr},
 }
 
 //XXX this should be renamed so as not to clash with the conventional
@@ -552,4 +555,18 @@ func timeTrunc(args *Args) (zng.Value, error) {
 	}
 	dur *= 1_000_000_000
 	return zng.Value{zng.TypeTime, args.Time(nano.Ts(ts.Trunc(dur)))}, nil
+}
+
+func typeOf(args *Args) (zng.Value, error) {
+	zv := args.vals[0]
+	return zng.Value{zng.TypeType, zng.EncodeType(zv.Type.String())}, nil
+}
+
+func isErr(args *Args) (zng.Value, error) {
+	zv := args.vals[0]
+	result := zng.True
+	if zv.Type != zng.TypeError {
+		result = zng.False
+	}
+	return result, nil
 }
