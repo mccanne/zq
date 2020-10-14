@@ -17,14 +17,12 @@ import (
 	"github.com/brimsec/zq/zng/resolver"
 )
 
-type multiCloser struct {
-	closers []io.Closer
-}
+type multiCloser []io.Closer
 
-func (c *multiCloser) Close() error {
+func (c multiCloser) Close() error {
 	var err error
-	for _, c := range c.closers {
-		if closeErr := c.Close(); err == nil {
+	for _, closer := range c {
+		if closeErr := closer.Close(); err == nil {
 			err = closeErr
 		}
 	}
@@ -49,18 +47,12 @@ func newSpanScanner(ctx context.Context, ark *Archive, zctx *resolver.Context, f
 		}
 		return &scannerCloser{sn, rc}, nil
 	}
-	closers := make([]io.Closer, 0, len(si.Chunks))
-	defer func() {
-		if err != nil {
-			for _, c := range closers {
-				c.Close()
-			}
-		}
-	}()
+	closers := make(multiCloser, 0, len(si.Chunks))
 	readers := make([]zbuf.Reader, 0, len(si.Chunks))
 	for _, chunk := range si.Chunks {
 		rc, err := iosrc.NewReader(ctx, chunk.Path(ark))
 		if err != nil {
+			closers.Close()
 			return nil, err
 		}
 		closers = append(closers, rc)
@@ -68,11 +60,12 @@ func newSpanScanner(ctx context.Context, ark *Archive, zctx *resolver.Context, f
 	}
 	sn, err := scanner.NewCombiner(ctx, readers, zbuf.RecordCompare(ark.DataSortDirection), f, filterExpr, si.Span)
 	if err != nil {
+		closers.Close()
 		return nil, err
 	}
 	return &scannerCloser{
 		Scanner: sn,
-		Closer:  &multiCloser{closers},
+		Closer:  closers,
 	}, nil
 }
 
