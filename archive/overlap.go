@@ -2,6 +2,7 @@ package archive
 
 import (
 	"context"
+	"runtime"
 	"sort"
 
 	"github.com/brimsec/zq/driver"
@@ -10,6 +11,8 @@ import (
 	"github.com/brimsec/zq/zng"
 	"github.com/brimsec/zq/zng/resolver"
 	"github.com/segmentio/ksuid"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
 // mergeChunksToSpans takes an unordered set of Chunks with possibly overlapping
@@ -351,17 +354,26 @@ outer:
 }
 
 func Compact(ctx context.Context, ark *Archive) error {
-	return tsDirVisit(ctx, ark, nano.MaxSpan, func(_ tsDir, chunks []Chunk) error {
-		spans := alignChunksToSpans(chunks, ark.DataOrder, nano.MaxSpan)
-		removeMaskedChunks(spans, false)
-		spans = mergeCommonChunkSpans(spans, ark.DataOrder)
-		for _, s := range spans {
-			if err := compactOverlaps(ctx, ark, s); err != nil {
-				return err
+	group, ctx := errgroup.WithContext(ctx)
+	sem := semaphore.NewWeighted(int64(runtime.GOMAXPROCS(0)))
+	group.Go(func() error {
+		return tsDirVisit(ctx, ark, nano.MaxSpan, func(_ tsDir, chunks []Chunk) error {
+			spans := alignChunksToSpans(chunks, ark.DataOrder, nano.MaxSpan)
+			removeMaskedChunks(spans, false)
+			spans = mergeCommonChunkSpans(spans, ark.DataOrder)
+			for _, s := range spans {
+				if err := sem.Acquire(ctx, 1); err != nil {
+					return err
+				}
+				s := s
+				group.Go(func() error {
+					return compactOverlaps(ctx, ark, s)
+				})
 			}
-		}
-		return nil
+			return nil
+		})
 	})
+	return group.Wait()
 }
 
 func Purge(ctx context.Context, ark *Archive) error {
