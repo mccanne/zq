@@ -54,7 +54,7 @@ type Writer struct {
 	tmpdir      string
 	frameThresh int
 	keyType     *zng.TypeRecord
-	iow         io.WriteCloser
+	iow         iosrc.Replacer
 	childField  string
 	nlevel      int
 	order       zbuf.Order
@@ -101,7 +101,7 @@ func NewWriterWithContext(ctx context.Context, zctx *resolver.Context, path stri
 	if err != nil {
 		return nil, err
 	}
-	w.iow, err = iosrc.NewWriter(ctx, w.uri)
+	w.iow, err = iosrc.NewReplacer(ctx, w.uri)
 	if err != nil {
 		return nil, err
 	}

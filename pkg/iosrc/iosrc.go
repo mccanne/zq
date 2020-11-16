@@ -142,6 +142,18 @@ func GetSource(uri URI) (Source, error) {
 	return source, nil
 }
 
+func NewReplacer(ctx context.Context, uri URI) (Replacer, error) {
+	src, err := GetSource(uri)
+	if err != nil {
+		return nil, err
+	}
+	replacerAble, ok := src.(ReplacerAble)
+	if !ok {
+		return nil, errors.New("source does not support replacement")
+	}
+	return replacerAble.NewReplacer(ctx, uri)
+}
+
 func Replace(ctx context.Context, uri URI, fn func(w io.Writer) error) error {
 	src, err := GetSource(uri)
 	if err != nil {
