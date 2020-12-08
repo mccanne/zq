@@ -90,6 +90,6 @@ func mdTsOrderCheck(u iosrc.URI, op string, order zbuf.Order, first, last nano.T
 		return nil
 	}
 	err := fmt.Errorf("metadata failed order check %s op %s order %s first %v last %v", u, op, order, int64(first), int64(last))
-	zap.L().Error("mdTsOrderCheck failed", zap.Error(err))
+	zap.L().Error("mdTsOrderCheck failed", zap.Error(err), zap.Stack("stack"))
 	return err
 }
