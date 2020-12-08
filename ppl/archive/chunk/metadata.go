@@ -11,6 +11,7 @@ import (
 	"github.com/brimsec/zq/zio/zngio"
 	"github.com/brimsec/zq/zng/resolver"
 	"github.com/segmentio/ksuid"
+	"go.uber.org/zap"
 )
 
 type Metadata struct {
@@ -88,5 +89,7 @@ func mdTsOrderCheck(u iosrc.URI, op string, order zbuf.Order, first, last nano.T
 	if x <= y {
 		return nil
 	}
-	return fmt.Errorf("metadata failed order check %s op %s order %s first %v last %v", u, op, order, int64(first), int64(last))
+	err := fmt.Errorf("metadata failed order check %s op %s order %s first %v last %v", u, op, order, int64(first), int64(last))
+	zap.L().Error("mdTsOrderCheck failed", zap.Error(err))
+	return err
 }
