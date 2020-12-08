@@ -25,6 +25,7 @@ type Writer struct {
 	lastTs         nano.Ts
 	masks          []ksuid.KSUID
 	needIndexWrite bool
+	order          zbuf.Order
 	seekIndex      *seekindex.Builder
 	dir            iosrc.URI
 	wroteFirst     bool
@@ -49,6 +50,7 @@ func NewWriter(ctx context.Context, dir iosrc.URI, order zbuf.Order, masks []ksu
 		id:             id,
 		seekIndex:      seekIndex,
 		masks:          masks,
+		order:          order,
 		dir:            dir,
 	}, nil
 }
@@ -108,7 +110,7 @@ func (cw *Writer) CloseWithTs(ctx context.Context, firstTs, lastTs nano.Ts) (Chu
 		Masks:       cw.masks,
 		Size:        cw.dataFileWriter.Position(),
 	}
-	if err := metadata.Write(ctx, MetadataPath(cw.dir, cw.id)); err != nil {
+	if err := metadata.Write(ctx, MetadataPath(cw.dir, cw.id), cw.order); err != nil {
 		cw.seekIndex.Abort()
 		return Chunk{}, err
 	}

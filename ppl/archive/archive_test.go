@@ -111,7 +111,7 @@ func TestOpenOptions(t *testing.T) {
 				return err
 			}
 			uri.Path = path.Dir(uri.Path)
-			chunk, err := chunk.Open(context.Background(), uri, id)
+			chunk, err := chunk.Open(context.Background(), uri, id, zbuf.OrderDesc)
 			if err != nil {
 				return err
 			}
@@ -178,7 +178,7 @@ func TestSeekIndex(t *testing.T) {
 				return err
 			}
 			uri.Path = path.Dir(uri.Path)
-			chunk, err := chunk.Open(context.Background(), uri, id)
+			chunk, err := chunk.Open(context.Background(), uri, id, zbuf.OrderAsc)
 			if err != nil {
 				return err
 			}

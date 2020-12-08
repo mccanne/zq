@@ -7,6 +7,7 @@ import (
 	"github.com/brimsec/zq/pkg/bufwriter"
 	"github.com/brimsec/zq/pkg/iosrc"
 	"github.com/brimsec/zq/pkg/nano"
+	"github.com/brimsec/zq/zbuf"
 	"github.com/brimsec/zq/zio/zngio"
 	"github.com/brimsec/zq/zng/resolver"
 	"github.com/segmentio/ksuid"
@@ -20,7 +21,7 @@ type Metadata struct {
 	Size        int64
 }
 
-func ReadMetadata(ctx context.Context, uri iosrc.URI) (Metadata, error) {
+func ReadMetadata(ctx context.Context, uri iosrc.URI, order zbuf.Order) (Metadata, error) {
 	in, err := iosrc.NewReader(ctx, uri)
 	if err != nil {
 		return Metadata{}, err
@@ -34,6 +35,9 @@ func ReadMetadata(ctx context.Context, uri iosrc.URI) (Metadata, error) {
 	}
 	var md Metadata
 	if err := resolver.UnmarshalRecord(zctx, rec, &md); err != nil {
+		return Metadata{}, err
+	}
+	if err := mdTsOrderCheck(uri, "read", order, md.First, md.Last); err != nil {
 		return Metadata{}, err
 	}
 	return md, nil
@@ -51,7 +55,10 @@ func (m Metadata) Chunk(dir iosrc.URI, id ksuid.KSUID) Chunk {
 	}
 }
 
-func (m Metadata) Write(ctx context.Context, uri iosrc.URI) error {
+func (m Metadata) Write(ctx context.Context, uri iosrc.URI, order zbuf.Order) error {
+	if err := mdTsOrderCheck(uri, "write", order, m.First, m.Last); err != nil {
+		return err
+	}
 	zctx := resolver.NewContext()
 	rec, err := resolver.MarshalRecord(zctx, m)
 	if err != nil {
@@ -71,4 +78,15 @@ func (m Metadata) Write(ctx context.Context, uri iosrc.URI) error {
 
 func MetadataPath(dir iosrc.URI, id ksuid.KSUID) iosrc.URI {
 	return dir.AppendPath(fmt.Sprintf("%s-%s.zng", FileKindMetadata, id))
+}
+
+func mdTsOrderCheck(u iosrc.URI, op string, order zbuf.Order, first, last nano.Ts) error {
+	x, y := first, last
+	if order == zbuf.OrderDesc {
+		x, y = y, x
+	}
+	if x <= y {
+		return nil
+	}
+	return fmt.Errorf("metadata failed order check %s op %s order %s first %v last %v", u, op, order, int64(first), int64(last))
 }

@@ -67,8 +67,8 @@ type Chunk struct {
 	Size        int64
 }
 
-func Open(ctx context.Context, dir iosrc.URI, id ksuid.KSUID) (Chunk, error) {
-	meta, err := ReadMetadata(ctx, MetadataPath(dir, id))
+func Open(ctx context.Context, dir iosrc.URI, id ksuid.KSUID, order zbuf.Order) (Chunk, error) {
+	meta, err := ReadMetadata(ctx, MetadataPath(dir, id), order)
 	if err != nil {
 		return Chunk{}, err
 	}
