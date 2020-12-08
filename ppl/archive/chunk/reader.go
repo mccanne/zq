@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/brimsec/zq/pkg/iosrc"
 	"github.com/brimsec/zq/pkg/nano"
@@ -14,8 +15,21 @@ import (
 type Reader struct {
 	io.Reader
 	io.Closer
+	start     nano.Ts
 	TotalSize int64
 	ReadSize  int64
+}
+
+func (r *Reader) Read(b []byte) (int, error) {
+	if r.start == 0 {
+		r.start = nano.Now()
+	}
+	return r.Reader.Read(b)
+}
+
+func (r *Reader) Close() error {
+	fmt.Println("duration", time.Since(r.start.Time()))
+	return r.Closer.Close()
 }
 
 // NewReader returns a Reader for this chunk. If the chunk has a seek index and
