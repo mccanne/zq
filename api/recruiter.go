@@ -18,6 +18,7 @@ type Worker struct {
 }
 
 type RegisterRequest struct {
+	RequestedTimeout int `json:"requested_timeout"`
 	Worker
 }
 

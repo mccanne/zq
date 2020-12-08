@@ -1,6 +1,7 @@
 package recruiter
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net"
@@ -24,6 +25,7 @@ type WorkerPool struct {
 type WorkerDetail struct {
 	Addr     string
 	NodeName string
+	Ctx      context.Context // context to cancel longpoll for recruited worker
 }
 
 func NewWorkerPool() *WorkerPool {
@@ -41,14 +43,14 @@ func NewWorkerPool() *WorkerPool {
 // In the nodePool, workers are added to the end of the slice,
 // and when they are recruited workers are removed from the start of the slice.
 // So the []WorkerDetail slice for each node functions as a FIFO queue.
-func (pool *WorkerPool) Register(addr string, nodename string) (bool, error) {
+func (pool *WorkerPool) Register(addr string, nodename string, ctx context.Context) (bool, error) {
 	if _, _, err := net.SplitHostPort(addr); err != nil {
 		return false, fmt.Errorf("invalid address for Register: %w", err)
 	}
 	if nodename == "" {
 		return false, fmt.Errorf("node name required for Register")
 	}
-	wd := WorkerDetail{Addr: addr, NodeName: nodename}
+	wd := WorkerDetail{Addr: addr, NodeName: nodename, Ctx: ctx}
 
 	pool.mu.Lock()
 	defer pool.mu.Unlock()

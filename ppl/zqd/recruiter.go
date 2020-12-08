@@ -3,8 +3,10 @@ package zqd
 // system test with: make TEST=TestZq/ztests/suite/zqd/rec-curl
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/brimsec/zq/api"
 	"github.com/brimsec/zq/zqe"
@@ -19,6 +21,44 @@ func handleDeregister(c *Core, w http.ResponseWriter, r *http.Request) {
 	c.workerPool.Deregister(req.Addr)
 	respond(c, w, r, http.StatusOK, api.RegisterResponse{
 		Registered: false,
+	})
+}
+
+func longPollWait(ctx context.Context, wait int) string {
+}
+
+func handleLongPollRegister(c *Core, w http.ResponseWriter, r *http.Request) {
+	var req api.RegisterRequest
+	if !request(c, w, r, &req) {
+		return
+	}
+	if req.RequestedTimeout <= 0 {
+		respondError(c, w, r, zqe.E(zqe.Invalid, "required parameter RequestedTimeout"))
+		return
+	}
+
+	ctx := r.Context()
+	registered, err := c.workerPool.Register(req.Addr, req.NodeName, ctx)
+	if err != nil {
+		respondError(c, w, r, zqe.ErrInvalid(err))
+		return
+	}
+
+	ticker := time.NewTicker(time.Duration(req.RequestedTimeout) * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			println("Received context cancel")
+			return "cancelled"
+		case <-ticker.C:
+			println("finished waiting %d", wait)
+			return "expired"
+		}
+	}
+
+	respond(c, w, r, http.StatusOK, api.RegisterResponse{
+		Registered: registered,
 	})
 }
 

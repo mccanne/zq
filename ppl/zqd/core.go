@@ -141,6 +141,7 @@ func (c *Core) addAPIServerRoutes() {
 func (c *Core) addRecruiterRoutes() {
 	c.handle("/recruiter/deregister", handleDeregister).Methods("POST")
 	c.handle("/recruiter/listfree", handleListFree).Methods("GET")
+	c.handle("/recruiter/longpollregister", handleLongPollRegister).Methods("POST")
 	c.handle("/recruiter/recruit", handleRecruit).Methods("POST")
 	c.handle("/recruiter/register", handleRegister).Methods("POST")
 	c.handle("/recruiter/stats", handleRecruiterStats).Methods("GET")
