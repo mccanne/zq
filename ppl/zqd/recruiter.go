@@ -1,12 +1,12 @@
 package zqd
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/brimsec/zq/api"
+	"github.com/brimsec/zq/ppl/zqd/recruiter"
 	"github.com/brimsec/zq/zqe"
 	"go.uber.org/zap"
 )
@@ -22,9 +22,6 @@ func handleDeregister(c *Core, w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func longPollWait(ctx context.Context, wait int) string {
-}
-
 func handleLongPollRegister(c *Core, w http.ResponseWriter, r *http.Request) {
 	var req api.RegisterRequest
 	if !request(c, w, r, &req) {
@@ -35,8 +32,10 @@ func handleLongPollRegister(c *Core, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	recruited := make(chan recruiter.RecruitmentDetail)
+
 	ctx := r.Context()
-	registered, err := c.workerPool.Register(req.Addr, req.NodeName, ctx)
+	registered, err := c.workerPool.Register(req.Addr, req.NodeName, recruited)
 	if err != nil {
 		respondError(c, w, r, zqe.ErrInvalid(err))
 		return
@@ -49,7 +48,7 @@ func handleLongPollRegister(c *Core, w http.ResponseWriter, r *http.Request) {
 		case <-ctx.Done():
 			println("Received context cancel")
 			return "cancelled"
-		case <-ctx.Done():
+		case rd <- recruited:
 			println("Received context cancel")
 			return "cancelled"
 		case <-ticker.C:
