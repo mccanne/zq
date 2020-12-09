@@ -51,11 +51,16 @@ func handleLongPollRegister(c *Core, w http.ResponseWriter, r *http.Request) {
 		case <-ctx.Done():
 			println("Received context cancel")
 			return "cancelled"
+		case <-ctx.Done():
+			println("Received context cancel")
+			return "cancelled"
 		case <-ticker.C:
 			println("finished waiting %d", wait)
 			return "expired"
 		}
 	}
+
+	c.workerPool.Deregister(req.Addr, req.NodeName)
 
 	respond(c, w, r, http.StatusOK, api.RegisterResponse{
 		Registered: registered,

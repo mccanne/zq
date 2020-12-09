@@ -22,8 +22,16 @@ type RegisterRequest struct {
 	Worker
 }
 
+type WorkerDirective int
+
+const (
+	Reregister WorkerDirective = iota
+	Reserved
+	Shutdown
+)
+
 type RegisterResponse struct {
-	Registered bool `json:"registered"`
+	Directive WorkerDirective `json:"directive"`
 }
 
 type RecruitRequest struct {
