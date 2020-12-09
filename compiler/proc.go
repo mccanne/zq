@@ -9,7 +9,6 @@ import (
 	"github.com/brimsec/zq/field"
 	"github.com/brimsec/zq/proc"
 	"github.com/brimsec/zq/proc/combine"
-	"github.com/brimsec/zq/proc/cut"
 	filterproc "github.com/brimsec/zq/proc/filter"
 	"github.com/brimsec/zq/proc/fuse"
 	"github.com/brimsec/zq/proc/head"
@@ -56,16 +55,47 @@ func compileProc(custom Hook, node ast.Proc, pctx *proc.Context, parent proc.Int
 		return compileGroupBy(pctx, parent, v)
 
 	case *ast.CutProc:
+		if v.Complement {
+			return nil, errors.New("cut -c deprecated; use drop instead")
+		}
 		assignments, err := compileAssignments(v.Fields, pctx.TypeContext)
 		if err != nil {
 			return nil, err
 		}
 		lhs, rhs := splitAssignments(assignments)
-		cut, err := cut.New(pctx, parent, lhs, rhs, v.Complement)
+		cutter, err := expr.NewCutter(pctx.TypeContext, lhs, rhs)
 		if err != nil {
 			return nil, err
 		}
-		return cut, nil
+		cutter.AllowPartialCuts()
+		return proc.FromFunction(pctx, parent, cutter, "cut"), nil
+
+	case *ast.PickProc:
+		assignments, err := compileAssignments(v.Fields, pctx.TypeContext)
+		if err != nil {
+			return nil, err
+		}
+		lhs, rhs := splitAssignments(assignments)
+		cutter, err := expr.NewCutter(pctx.TypeContext, lhs, rhs)
+		if err != nil {
+			return nil, err
+		}
+		return proc.FromFunction(pctx, parent, cutter, "pick"), nil
+
+	case *ast.DropProc:
+		if len(v.Fields) == 0 {
+			return nil, errors.New("drop: no fields given")
+		}
+		fields := make([]field.Static, 0, len(v.Fields))
+		for _, e := range v.Fields {
+			field, ok := ast.DotExprToField(e)
+			if !ok {
+				return nil, errors.New("drop: arg not a field")
+			}
+			fields = append(fields, field)
+		}
+		dropper := expr.NewDropper(pctx.TypeContext, fields)
+		return proc.FromFunction(pctx, parent, dropper, "drop"), nil
 
 	case *ast.SortProc:
 		fields, err := CompileExprs(pctx.TypeContext, v.Fields)

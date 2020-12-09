@@ -1,4 +1,4 @@
-package cut_test
+package expr_test
 
 import (
 	"testing"
@@ -48,7 +48,7 @@ func TestCut(t *testing.T) {
 	proctest.TestOneProc(t, fooAndBar, fooOnly, "cut foo")
 
 	// test "cut foo" on records that don't have field foo
-	warning := "Cut field foo not present in input"
+	warning := "cut: nothing found for foo"
 	proctest.TestOneProcWithWarnings(t, barOnly, "", []string{warning}, "cut foo")
 
 	// test "cut foo" on some fields with foo, some without
@@ -65,19 +65,19 @@ func TestCut(t *testing.T) {
 	proctest.TestOneProc(t, fooAndBar, fooAndBar, "cut foo,bar")
 }
 
-func TestCutComplement(t *testing.T) {
+func TestDrop(t *testing.T) {
 	// test "cut foo" on records that only have field foo
-	proctest.TestOneProc(t, fooOnly, fooOnly, "cut -c boo")
+	proctest.TestOneProc(t, fooOnly, fooOnly, "drop boo")
 
 	// test "cut foo" on records that have fields foo and bar
-	proctest.TestOneProc(t, fooAndBar, barOnly, "cut -c foo")
+	proctest.TestOneProc(t, fooAndBar, barOnly, "drop foo")
 
 	// test "cut -c foo" on some fields with foo, some without
-	proctest.TestOneProc(t, fooOnly+barOnly, barOnly, "cut -c foo")
-	proctest.TestOneProc(t, barOnly+fooOnly, barOnly, "cut -c foo")
+	proctest.TestOneProc(t, fooOnly+barOnly, barOnly, "drop foo")
+	proctest.TestOneProc(t, barOnly+fooOnly, barOnly, "drop foo")
 
 	// test cut on multiple fields.
-	proctest.TestOneProc(t, fooAndBarAndBlar, fooOnly, "cut -c bar,blar")
+	proctest.TestOneProc(t, fooAndBarAndBlar, fooOnly, "drop bar,blar")
 }
 
 // Test that illegal cut operations fail at compile time with a
@@ -152,8 +152,12 @@ const nestedOut2Complement = `
 // Test cutting fields inside nested records.
 func TestCutNested(t *testing.T) {
 	proctest.TestOneProc(t, nestedIn1, nestedOut1, "cut rec.foo")
-	proctest.TestOneProc(t, nestedIn1, nestedOut1, "cut -c rec.bar")
 	proctest.TestOneProc(t, nestedIn1, nestedIn1, "cut rec.foo,rec.bar")
 	proctest.TestOneProc(t, nestedIn2, nestedOut2, "cut rec1.sub1.foo,rec1.sub2.bar,rec2.foo,foo")
-	proctest.TestOneProc(t, nestedIn2, nestedOut2Complement, "cut -c rec1")
+}
+
+// Test dropping fields inside nested records.
+func TestDropNested(t *testing.T) {
+	proctest.TestOneProc(t, nestedIn1, nestedOut1, "drop rec.bar")
+	proctest.TestOneProc(t, nestedIn2, nestedOut2Complement, "drop rec1")
 }

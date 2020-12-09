@@ -4,7 +4,7 @@ script: |
   zar import -R logs babble.tzng
   # make an index by hand for each log containing a sum
   zar index -R logs -q -o index -k s -z "sum(v) by s | sort s"
-  zar find -R logs -o - -x index -z amphitheatral-televox | zq -t "cut -c _log" -
+  zar find -R logs -o - -x index -z amphitheatral-televox | zq -t "drop _log" -
 
 inputs:
   - name: babble.tzng

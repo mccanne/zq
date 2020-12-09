@@ -95,3 +95,29 @@ func (t *TypeArray) Marshal(zv zcode.Bytes) (interface{}, error) {
 	}
 	return vals, nil
 }
+
+func (t *TypeArray) ZSON() string {
+	return fmt.Sprintf("[%s]", t.Type.ZSON())
+}
+
+func (t *TypeArray) ZSONOf(zv zcode.Bytes) string {
+	var b strings.Builder
+	sep := ""
+	b.WriteByte('[')
+	it := zv.Iter()
+	for !it.Done() {
+		val, _, err := it.Next()
+		if err != nil {
+			return badZng(err, t, zv)
+		}
+		b.WriteString(sep)
+		if val == nil {
+			b.WriteString("null")
+		} else {
+			b.WriteString(t.Type.ZSONOf(val))
+		}
+		sep = ","
+	}
+	b.WriteByte(']')
+	return b.String()
+}

@@ -27,9 +27,8 @@ The following available processors are documented in detail below:
 |                           |                                                             |
 | ------------------------- | ----------------------------------------------------------- |
 | **Description**           | Return the data only from the specified named fields.       |
-| **Syntax**                | `cut [-c] <field-list>`                                     |
+| **Syntax**                | `cut <field-list>`                   |
 | **Required<br>arguments** | `<field-list>`<br>One or more comma-separated field names or assignments.  |
-| **Optional<br>arguments** | `[-c]`<br>If specified, print all fields _other than_ those specified. |
 | **Developer Docs**        | https://pkg.go.dev/github.com/brimsec/zq/proc/cut            |
 
 #### Example #1:
@@ -51,23 +50,6 @@ TS                          UID
 
 #### Example #2:
 
-To return all fields _other than_ the `_path` field and `id` record of `weird` events:
-
-```zq-command
-zq -f table 'cut -c _path,id' weird.log.gz
-```
-
-#### Output:
-```zq-output head:4
-TS                          UID                NAME                             ADDL             NOTICE PEER
-2018-03-24T17:15:20.600843Z C1zOivgBT6dBmknqk  TCP_ack_underflow_or_misorder    -                F      zeek
-2018-03-24T17:15:20.608108Z -                  truncated_header                 -                F      zeek
-2018-03-24T17:15:20.610033Z C45Ff03lESjMQQQej1 above_hole_data_without_any_acks -                F      zeek
-...
-```
-
-#### Example #3:
-
 If the requested list of named fields returns no results, `cut` returns a warning.
 
 ```zq-command
@@ -76,10 +58,10 @@ zq -f table 'cut nothere,alsoabsent' weird.log.gz
 
 #### Output:
 ```zq-output
-Cut fields nothere,alsoabsent not present together in input
+cut: nothing found for nothere,alsoabsent
 ```
 
-#### Example #4:
+#### Example #3:
 
 As long as some of the named fields are present, these will be returned. No warning is generated for absent fields in this case.
 
@@ -96,7 +78,7 @@ above_hole_data_without_any_acks
 ...
 ```
 
-#### Example #5:
+#### Example #4:
 
 To return only the `ts` and `uid` columns of `conn` events, with `ts` renamed to `time`:
 
@@ -113,6 +95,33 @@ TIME                        UID
 ...
 ```
 
+---
+
+## `drop`
+
+|                           |                                                             |
+| ------------------------- | ----------------------------------------------------------- |
+| **Description**           | Return the data only from all but the specified named fields.       |
+| **Syntax**                | `drop <field-list>`                   |
+| **Required<br>arguments** | `<field-list>`<br>One or more comma-separated field names or assignments.  |
+| **Developer Docs**        | https://pkg.go.dev/github.com/brimsec/zq/proc            |
+
+#### Example #1:
+
+To return all fields _other than_ the `_path` field and `id` record of `weird` events:
+
+```zq-command
+zq -f table 'drop _path,id' weird.log.gz
+```
+
+#### Output:
+```zq-output head:4
+TS                          UID                NAME                             ADDL             NOTICE PEER
+2018-03-24T17:15:20.600843Z C1zOivgBT6dBmknqk  TCP_ack_underflow_or_misorder    -                F      zeek
+2018-03-24T17:15:20.608108Z -                  truncated_header                 -                F      zeek
+2018-03-24T17:15:20.610033Z C45Ff03lESjMQQQej1 above_hole_data_without_any_acks -                F      zeek
+...
+```
 
 ---
 

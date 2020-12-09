@@ -1,32 +1,25 @@
 package zng
 
 import (
+	"fmt"
+
 	"github.com/brimsec/zq/zcode"
 )
 
 type TypeOfType struct{}
 
-func NewType(s string) Value {
-	return Value{TypeType, EncodeString(s)}
-}
-
-func EncodeType(s string) zcode.Bytes {
-	return zcode.Bytes(s)
-}
-
-func DecodeType(zv zcode.Bytes) (string, error) {
-	if zv == nil {
-		return "null", nil
-	}
-	return string(zv), nil
-}
-
-func (t *TypeOfType) Parse(in []byte) (zcode.Bytes, error) {
-	return zcode.Bytes(in), nil
+func NewTypeType(t Type) Value {
+	return Value{TypeType, zcode.Bytes(t.ZSON())}
 }
 
 func (t *TypeOfType) ID() int {
 	return IdType
+}
+
+func (t *TypeOfType) Parse(in []byte) (zcode.Bytes, error) {
+	// There's nothing to parse.  The zcode value is the ZSON value.
+	// The caller should validate the canonical form.
+	return zcode.Bytes(in), nil
 }
 
 func (t *TypeOfType) String() string {
@@ -39,4 +32,12 @@ func (t *TypeOfType) StringOf(zv zcode.Bytes, fmt OutFmt, inContainer bool) stri
 
 func (t *TypeOfType) Marshal(zv zcode.Bytes) (interface{}, error) {
 	return t.StringOf(zv, OutFormatUnescaped, false), nil
+}
+
+func (t *TypeOfType) ZSON() string {
+	return "type"
+}
+
+func (t *TypeOfType) ZSONOf(zv zcode.Bytes) string {
+	return fmt.Sprintf("(%s)", string(zv))
 }

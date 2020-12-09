@@ -29,6 +29,10 @@ type Proc struct {
 }
 
 func New(pctx *proc.Context, left, right proc.Interface, leftKey, rightKey expr.Evaluator, lhs []field.Static, rhs []expr.Evaluator) (*Proc, error) {
+	cutter, err := expr.NewCutter(pctx.TypeContext, lhs, rhs)
+	if err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithCancel(pctx.Context)
 	return &Proc{
 		pctx:        pctx,
@@ -40,7 +44,7 @@ func New(pctx *proc.Context, left, right proc.Interface, leftKey, rightKey expr.
 		right:       zbuf.NewPeeker(newPuller(right, ctx)),
 		// XXX need to make sure nullsmax agrees with inbound merge
 		compare: expr.NewValueCompareFn(false),
-		cutter:  expr.NewCutter(pctx.TypeContext, false, lhs, rhs),
+		cutter:  cutter,
 		types:   make(map[int]map[int]*zng.TypeRecord),
 	}, nil
 }
@@ -93,7 +97,7 @@ func (p *Proc) Pull() (zbuf.Batch, error) {
 		// Batch and lives in a pool so the downstream user can
 		// release the batch with and bypass GC.
 		for _, rightRec := range rightRecs {
-			cutRec, err := p.cutter.Cut(rightRec)
+			cutRec, err := p.cutter.Apply(rightRec)
 			if err != nil {
 				return nil, err
 			}

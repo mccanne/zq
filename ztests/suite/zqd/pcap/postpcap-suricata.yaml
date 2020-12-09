@@ -2,6 +2,7 @@ script: |
   source services.sh
   zapi -h $ZQD_HOST -s testsp postpcap -f alerts.pcap >/dev/null
   zapi -h $ZQD_HOST -s testsp get -f tzng "event_type = alert | every 1s count()"
+  zapi -h $ZQD_HOST -s testsp get -f tzng "event_type = alert and community_id != '' | count()"
   echo ===
   zapi -h $ZQD_HOST -s testsp get -f tzng "_path != null | count()"
 
@@ -17,6 +18,8 @@ outputs:
       #0:record[ts:time,count:uint64]
       0:[1425568033;13;]
       0:[1425567868;2;]
+      #0:record[count:uint64]
+      0:[15;]
       ===
       #0:record[count:uint64]
       0:[379;]

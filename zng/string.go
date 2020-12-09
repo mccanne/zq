@@ -80,3 +80,11 @@ func (t *TypeOfString) StringOf(zv zcode.Bytes, fmt OutFmt, inContainer bool) st
 func (t *TypeOfString) Marshal(zv zcode.Bytes) (interface{}, error) {
 	return t.StringOf(zv, OutFormatUnescaped, false), nil
 }
+
+func (t *TypeOfString) ZSON() string {
+	return "string"
+}
+
+func (t *TypeOfString) ZSONOf(zv zcode.Bytes) string {
+	return QuotedString(zv, false)
+}

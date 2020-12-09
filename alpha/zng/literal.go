@@ -14,7 +14,7 @@ func ParseLiteral(literal ast.Literal) (interface{}, error) {
 	// specifically arrays of bytes that do not correspond to
 	// UTF-8 encoded strings).
 	if literal.Type == "string" {
-		literal = ast.Literal{ast.Node{"Literal"}, "bstring", literal.Value}
+		literal = ast.Literal{Op: "Literal", Type: "bstring", Value: literal.Value}
 	}
 	v, err := Parse(literal)
 	if err != nil {

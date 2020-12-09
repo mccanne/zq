@@ -62,6 +62,11 @@ type Type interface {
 	// example should prefer to use this instead of using the go
 	// .(type) operator on a zng.Type instance.
 	ID() int
+
+	// XXX temporary methods until we deprecate tzng then we will
+	// move this logic into String()/StringOf()
+	ZSON() string
+	ZSONOf(zv zcode.Bytes) string
 }
 
 var (

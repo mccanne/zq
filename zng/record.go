@@ -140,3 +140,42 @@ func (t *TypeRecord) createLUT() {
 		t.LUT[string(col.Name)] = k
 	}
 }
+
+func (t *TypeRecord) ZSON() string {
+	var b strings.Builder
+	b.WriteString("{")
+	sep := ""
+	for _, c := range t.Columns {
+		b.WriteString(sep)
+		b.WriteString(QuotedName(c.Name))
+		b.WriteByte(':')
+		b.WriteString(c.Type.ZSON())
+		sep = ","
+	}
+	b.WriteString("}")
+	return b.String()
+}
+
+func (t *TypeRecord) ZSONOf(zv zcode.Bytes) string {
+	var b strings.Builder
+	b.WriteString("{")
+	sep := ""
+	it := zv.Iter()
+	for _, c := range t.Columns {
+		val, _, err := it.Next()
+		if err != nil {
+			return badZng(err, t, zv)
+		}
+		b.WriteString(sep)
+		b.WriteString(QuotedName(c.Name))
+		b.WriteByte(':')
+		if val == nil {
+			b.WriteString("null")
+		} else {
+			b.WriteString(c.Type.ZSONOf(val))
+		}
+		sep = ","
+	}
+	b.WriteString("}")
+	return b.String()
+}

@@ -87,10 +87,14 @@ func NewFlowgraphIndexer(ctx context.Context, zctx *resolver.Context, uri iosrc.
 		return nil, err
 	}
 	fields, resolvers := compiler.CompileAssignments(keys, keys)
+	cutter, err := expr.NewCutter(zctx, fields, resolvers)
+	if err != nil {
+		return nil, err
+	}
 	return &FlowgraphIndexer{
 		zctx:   zctx,
 		w:      writer,
-		cutter: expr.NewStrictCutter(zctx, false, fields, resolvers),
+		cutter: cutter,
 	}, nil
 }
 
@@ -98,7 +102,7 @@ func (f *FlowgraphIndexer) Write(_ int, batch zbuf.Batch) error {
 	defer batch.Unref()
 	for i := 0; i < batch.Length(); i++ {
 		rec := batch.Index(i)
-		key, err := f.cutter.Cut(rec)
+		key, err := f.cutter.Apply(rec)
 		if err != nil {
 			return fmt.Errorf("checking index record: %w", err)
 		}

@@ -3,13 +3,13 @@ script: |
   source minio.sh
   zar import -R logs -data s3://bucket/zartest log.tzng
   zar index -R logs -q :ip
-  zar find -R logs -z :ip=1.1.1.1 | zq -t "cut -c _log" -
+  zar find -R logs -z :ip=1.1.1.1 | zq -t "drop _log" -
   echo ===
-  zar find -R logs -z :ip=192.168.1.102 | zq -t "cut -c _log" -
+  zar find -R logs -z :ip=192.168.1.102 | zq -t "drop _log" -
   echo ===
-  zar find -R logs -z :ip=192.168.2.1 | zq -t "cut -c _log" -
+  zar find -R logs -z :ip=192.168.2.1 | zq -t "drop _log" -
   echo ===
-  zar find -R logs -z :ip=192.168.1.1 | zq -t "cut -c _log" -
+  zar find -R logs -z :ip=192.168.1.1 | zq -t "drop _log" -
   echo ===
   zar ls -R logs -ranges -l
   zq -t "count(key)" $(find data/bucket/zartest -name microindex-type-ip.zng) # check unset not indexed

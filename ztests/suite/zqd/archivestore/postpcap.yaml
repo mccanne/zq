@@ -1,7 +1,7 @@
 script: |
   source services.sh
   zapi -h $ZQD_HOST -s testsp postpcap -k archivestore -f ng.pcap >/dev/null
-  zapi -h $ZQD_HOST -s testsp get -f tzng "_path != stats | cut -c uid,geo | sort -r ts, _path"
+  zapi -h $ZQD_HOST -s testsp get -f tzng "_path != stats | drop uid,geo | sort -r ts, _path"
   echo ===
   zapi -h $ZQD_HOST -s testsp get -f tzng "count()"
 

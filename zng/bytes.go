@@ -2,6 +2,7 @@ package zng
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 
 	"github.com/brimsec/zq/zcode"
 )
@@ -46,4 +47,12 @@ func (t *TypeOfBytes) StringOf(zv zcode.Bytes, fmt OutFmt, inContainer bool) str
 
 func (t *TypeOfBytes) Marshal(zv zcode.Bytes) (interface{}, error) {
 	return t.StringOf(zv, OutFormatUnescaped, false), nil
+}
+
+func (t *TypeOfBytes) ZSON() string {
+	return "bytes"
+}
+
+func (t *TypeOfBytes) ZSONOf(zv zcode.Bytes) string {
+	return "0x" + hex.EncodeToString(zv)
 }

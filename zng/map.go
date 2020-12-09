@@ -149,3 +149,33 @@ func NormalizeMap(zv zcode.Bytes) zcode.Bytes {
 	}
 	return norm
 }
+
+func (t *TypeMap) ZSON() string {
+	return fmt.Sprintf("|{%s,%s}|", t.KeyType.ZSON(), t.ValType.ZSON())
+}
+
+func (t *TypeMap) ZSONOf(zv zcode.Bytes) string {
+	var b strings.Builder
+	it := zv.Iter()
+	b.WriteString("|{")
+	sep := ""
+	for !it.Done() {
+		val, _, err := it.Next()
+		if err != nil {
+			return badZng(err, t, zv)
+		}
+		b.WriteString(sep)
+		b.WriteByte('{')
+		b.WriteString(t.KeyType.ZSONOf(val))
+		val, _, err = it.Next()
+		if err != nil {
+			return badZng(err, t, zv)
+		}
+		b.WriteString(t.ValType.ZSONOf(val))
+		b.WriteByte('}')
+		b.WriteString(sep)
+		sep = ","
+	}
+	b.WriteString("}|")
+	return b.String()
+}

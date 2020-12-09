@@ -1,0 +1,12 @@
+zql: 'cut x=network_of(addr)'
+
+input: |
+  #0:record[addr:ip]
+  0:[fe80::215:17ff:fe84:c13f;]
+  0:[10.0.0.1;]
+
+output: |
+  #0:record[x:error]
+  0:[not an IPv4;]
+  #1:record[x:net]
+  1:[10.0.0.0/8;]

@@ -3,7 +3,7 @@ script: |
   zapi -h $ZQD_HOST new -k archivestore testsp >/dev/null
   zapi -h $ZQD_HOST -s testsp post babble.tzng >/dev/null
   zapi -h $ZQD_HOST -s testsp index create -k key -o index.zng -z "sum(v) by s | put key=s | sort key"
-  zapi -h $ZQD_HOST -s testsp index find -z -x index.zng glycerite-oligoprothesy | zq -t "cut -c _log" -
+  zapi -h $ZQD_HOST -s testsp index find -z -x index.zng glycerite-oligoprothesy | zq -t "drop _log" -
 
 inputs:
   - name: services.sh

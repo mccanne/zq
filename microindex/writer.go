@@ -110,8 +110,8 @@ func NewWriterWithContext(ctx context.Context, zctx *resolver.Context, path stri
 		return nil, err
 	}
 	fields, resolvers := compiler.CompileAssignments(w.keyFields, w.keyFields)
-	w.cutter = expr.NewStrictCutter(zctx, false, fields, resolvers)
-	return w, nil
+	w.cutter, err = expr.NewCutter(zctx, fields, resolvers)
+	return w, err
 }
 
 type Option interface {
@@ -155,7 +155,7 @@ func (w *Writer) Write(rec *zng.Record) error {
 		if err != nil {
 			return err
 		}
-		keys, err := w.cutter.Cut(rec)
+		keys, err := w.cutter.Apply(rec)
 		if err != nil {
 			return err
 		}
@@ -342,7 +342,7 @@ func (w *indexWriter) write(rec *zng.Record) error {
 		// (or until we know it's the last frame in the file).
 		// So we build the frame key record from the current record
 		// here ahead of its use and save it in the frameKey variable.
-		key, err := w.base.cutter.Cut(rec)
+		key, err := w.base.cutter.Apply(rec)
 		if err != nil {
 			return err
 		}

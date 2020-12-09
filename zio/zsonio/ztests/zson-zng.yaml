@@ -1,0 +1,38 @@
+# Send zson into zng and back out to make sure binary encoding of typevals works.
+
+script: |
+  zq "put t=typeof(.)" in.tzng | zq -f zson -
+
+inputs:
+  - name: in.tzng
+    data: |
+      #foo=uint8
+      #0:record[a:string,b:string,n:int32,f:array[foo]]
+      0:[hello;world;123;[1;2;3;]]
+      0:[goodbye;world;456;[4;5;6;]]
+
+outputs:
+  - name: stdout
+    data: |
+      {
+          a: "hello",
+          b: "world",
+          n: 123 (int32),
+          f: [
+              1 (uint8),
+              2 (uint8),
+              3 (uint8)
+          ] (=0),
+          t: ({a:string,b:string,n:int32,f:[foo=(uint8)]})
+      } (=1)
+      {
+          a: "goodbye",
+          b: "world",
+          n: 456,
+          f: [
+              4,
+              5,
+              6
+          ],
+          t: ({a:string,b:string,n:int32,f:[foo=(uint8)]})
+      } (1)

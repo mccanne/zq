@@ -5,11 +5,11 @@ script: |
   zar import -R logs babble-norm-shuf-3.tzng
   zar ls -R logs -ranges
   echo ===
-  zar stat -R logs -f zng | zq -t "cut -c log_id" -
+  zar stat -R logs -f zng | zq -t "drop log_id" -
   echo ===
   zar compact -R logs
   zar ls -R logs -ranges
-  zar stat -R logs -f zng | zq -t "cut -c log_id" -
+  zar stat -R logs -f zng | zq -t "drop log_id" -
   echo ===
   zar import -R logs babble-norm-shuf-4.tzng
   zar ls -R logs -ranges
@@ -18,11 +18,11 @@ script: |
   zar ls -R logs -ranges
   zar zq -R logs -t "count()"
   echo ===
-  zar stat -R logs -f zng | zq -t "cut -c log_id" -
+  zar stat -R logs -f zng | zq -t "drop log_id" -
   echo ===
   zar compact -R logs -purge
   zar zq -R logs -t "count()"
-  zar stat -R logs -f zng | zq -t "cut -c log_id" -
+  zar stat -R logs -f zng | zq -t "drop log_id" -
   echo ===
   zar import -R logs babble-norm-shuf-5.tzng
   zar zq -R logs -t "count()"

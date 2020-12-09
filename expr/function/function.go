@@ -7,6 +7,8 @@ import (
 	"github.com/brimsec/zq/anymath"
 	"github.com/brimsec/zq/expr/result"
 	"github.com/brimsec/zq/zng"
+	"github.com/brimsec/zq/zng/resolver"
+	"github.com/brimsec/zq/zson"
 )
 
 var (
@@ -60,7 +62,7 @@ func isDeprecated(name string) error {
 	return nil
 }
 
-func New(name string, narg int) (Interface, error) {
+func New(zctx *resolver.Context, name string, narg int) (Interface, error) {
 	if err := isDeprecated(name); err != nil {
 		return nil, err
 	}
@@ -123,7 +125,7 @@ func New(name string, narg int) (Interface, error) {
 		argmax = 2
 		f = &trunc{}
 	case "typeof":
-		f = &typeOf{}
+		f = &typeOf{zson.NewTypeTable()}
 	case "iserr":
 		f = &isErr{}
 	case "to_base64":
@@ -175,11 +177,13 @@ func (l *lenFn) Call(args []zng.Value) (zng.Value, error) {
 	}
 }
 
-type typeOf struct{}
+type typeOf struct {
+	types *zson.TypeTable
+}
 
 func (t *typeOf) Call(args []zng.Value) (zng.Value, error) {
-	// XXX This needs to change to a ZSON type value format. See issue #1675.
-	return zng.Value{zng.TypeType, zng.EncodeType(args[0].Type.String())}, nil
+	typ := args[0].Type
+	return t.types.LookupValue(typ), nil
 }
 
 type isErr struct{}

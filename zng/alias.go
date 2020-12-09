@@ -1,6 +1,8 @@
 package zng
 
 import (
+	"fmt"
+
 	"github.com/brimsec/zq/zcode"
 )
 
@@ -44,6 +46,14 @@ func (t *TypeAlias) StringOf(zv zcode.Bytes, out OutFmt, b bool) string {
 
 func (t *TypeAlias) Marshal(zv zcode.Bytes) (interface{}, error) {
 	return t.Type.Marshal(zv)
+}
+
+func (t *TypeAlias) ZSON() string {
+	return fmt.Sprintf("%s=(%s)", t.Name, t.Type.ZSON())
+}
+
+func (t *TypeAlias) ZSONOf(zv zcode.Bytes) string {
+	return t.Type.ZSONOf(zv)
 }
 
 func AliasedType(typ Type) Type {

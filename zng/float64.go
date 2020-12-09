@@ -67,3 +67,15 @@ func (t *TypeOfFloat64) StringOf(zv zcode.Bytes, _ OutFmt, _ bool) string {
 func (t *TypeOfFloat64) Marshal(zv zcode.Bytes) (interface{}, error) {
 	return DecodeFloat64(zv)
 }
+
+func (t *TypeOfFloat64) ZSON() string {
+	return "float64"
+}
+
+func (t *TypeOfFloat64) ZSONOf(zv zcode.Bytes) string {
+	d, err := DecodeFloat64(zv)
+	if err != nil {
+		return badZng(err, t, zv)
+	}
+	return strconv.FormatFloat(d, 'e', -1, 64)
+}

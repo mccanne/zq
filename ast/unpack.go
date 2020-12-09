@@ -93,6 +93,20 @@ func unpackProc(custom Unpacker, node joe.Interface) (Proc, error) {
 			return nil, err
 		}
 		return &CutProc{Fields: fas}, nil
+	case "PickProc":
+		a, _ := node.Get("fields")
+		fas, err := unpackAssignments(a)
+		if err != nil {
+			return nil, err
+		}
+		return &PickProc{Fields: fas}, nil
+	case "DropProc":
+		a, _ := node.Get("fields")
+		fields, err := unpackExprs(a)
+		if err != nil {
+			return nil, err
+		}
+		return &DropProc{Fields: fields}, nil
 	case "HeadProc":
 		return &HeadProc{}, nil
 	case "TailProc":

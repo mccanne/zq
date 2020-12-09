@@ -1,4 +1,6 @@
-zql: 'count() by typeof(.) | sort .'
+zql: 'count() by typeof(.) | sort count'
+
+output-flags: -f zson
 
 input: |
   #0:record[x:int32,s:string]
@@ -10,6 +12,11 @@ input: |
   1:[7;]
 
 output: |
-  #0:record[typeof:type,count:uint64]
-  0:[record[y:int64];3;]
-  0:[record[x:int32,s:string];2;]
+  {
+      typeof: ({x:int32,s:string}),
+      count: 2 (uint64)
+  } (=0)
+  {
+      typeof: ({y:int64}),
+      count: 3
+  } (0)

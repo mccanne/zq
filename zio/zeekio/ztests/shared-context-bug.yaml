@@ -1,4 +1,4 @@
-zql: cut id | put id2=id.orig_h | cut -c id.orig_h
+zql: cut id | put id2=id.orig_h | drop id.orig_h
 
 input: |
   #separator \x09

@@ -65,3 +65,16 @@ func (t *TypeOfTime) Marshal(zv zcode.Bytes) (interface{}, error) {
 	}
 	return ts.Time().UTC().Format(time.RFC3339Nano), nil
 }
+
+func (t *TypeOfTime) ZSON() string {
+	return "time"
+}
+
+func (t *TypeOfTime) ZSONOf(zv zcode.Bytes) string {
+	ts, err := DecodeTime(zv)
+	if err != nil {
+		return badZng(err, t, zv)
+	}
+	b := ts.Time().Format(time.RFC3339Nano)
+	return string(b)
+}

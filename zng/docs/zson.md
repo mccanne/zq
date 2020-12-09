@@ -33,7 +33,15 @@
     - [3.4.4 Union Value](#344-union-value)
     - [3.4.5 Enum Value](#345-enum-value)
     - [3.4.6 Map Value](#346-map-value)
-  + [3.5 Type Value](#35-type-value)
+    - [3.4.7 Type Value](#347-type-value)
+  + [3.5 Type Syntax](#35-type-syntax)
+    - [3.5.1 Record Type](#351-record-type)
+    - [3.5.2 Array Type](#352-array-type)
+    - [3.5.3 Set Type](#353-set-type)
+    - [3.5.4 Union Type](#354-union-type)
+    - [3.5.5 Enum Type](#355-enum-type)
+    - [3.5.6 Map Type](#356-map-type)
+    - [3.5.7 Type Type](#357-type-type)
   + [3.6 Null Value](#36-null-value)
 * [4. Examples](#4-examples)
 
@@ -89,14 +97,14 @@ A structured SQL table might look like this:
 ```
 This ZSON text depicts three record values.  It defines a type called `city_schema`
 based on the first value and decorates the two subsequent values with that type.
-The implied value of the `city_schema` record type is:
+The inferred value of the `city_schema` type is a record type depicted as:
 ```
 { city:string, state:string, population:uint32 }
 ```
-When all the values have the same record type, the values can be interpreted
-as a _table_, where the ZSON record values are _rows_ and the fields of
-the records form _columns_.  In this way, these three records form a relational
-table conforming to the schema `city_schema`.
+When all the values in a sequence have the same record type, the sequence
+can be interpreted as a _table_, where the ZSON record values form the _rows_
+and the fields of the records form the _columns_.  In this way, these
+three records form a relational table conforming to the schema `city_schema`.
 
 In contrast, a ZSON text representing a semi-structured sequence of log lines
 might look like this:
@@ -145,6 +153,16 @@ unambiguously the primitive type `time`.  Further,
 note that the `value` field takes on different types and even a complex record
 type on the last line.  In this case, there is a different type top-level
 record type implied by each of the three variations of type of the `value` field.
+
+Note that when a record is decorated, the field names may be omitted as
+the decorator implies the missing names, e.g.,
+```
+{
+    "Connection Example 2",
+    { 10.1.1.8, 80 },
+    { 10.1.2.88, 19801 }
+} (conn)
+```
 
 ## 2. The ZSON Data Model
 
@@ -242,13 +260,14 @@ If a ZSON input includes data that is not valid UTF-8, the input is invalid.
 
 ### 3.1 Identifiers
 
-ZSON identifiers are used in several contexts:
-* unquoted field names,
-* names of enum elements, and
-* external type definition names,
+ZSON identifiers are used in several contexts, as names of:
+* unquoted fields,
+* unquoted enum elements, and
+* external type definitions.
 
 Identifiers are case-sensitive and can contain Unicode letters, `$`, `_`,
-and digits (0-9), but may not start with a digit.
+and digits (0-9), but may not start with a digit.  An identifier cannot be
+`true`, `false`, or `null`.
 
 ### 3.2 Type Decorators
 
@@ -257,8 +276,7 @@ The syntax for a decorator is a parenthesized type, as in
 ```
 <value> ( <decorator> )
 ```
-where a `<decorator>` is either an integer representing an internal type
-or a ZSON type value.  Note that an internal type is not a ZSON type value.
+where a `<decorator>` is either a type or a type definition.
 
 It is an error for the decorator to be type incompatible with its referenced value.  
 
@@ -266,32 +284,45 @@ It is an error for the decorator to be type incompatible with its referenced val
 
 #### 3.2.1 Type Definitions
 
-Type names are defined by binding a name to a type with an assignment decorator
+New type names are created by binding a name to a type with an assignment decorator
 of the form
 ```
 <value> (= <identifier> )
 ```
-This creates a new type whose name is given by the identifier.
-The type bound to that name is the type value of `<value>`.  This new
-type may then be used as or within a type value or decorator.  The name
+This creates a new type whose name is given by the identifier and whose
+type is equivalent to the type of `<value>`.  This new
+type may then be used anywhere a type may appear.  The name
 of the type definition
 must not be equal to any of the primitive type names.
 
-The result of a type definition is a value with the new type.
-Thus, type definitions can be chained as in
+A type definition may also appear inside a decorator as in
 ```
- <value> (= <identifier> ) (= <identifer> )
+<identifier> = ( <type> )
 ```
+where the result of this expression is the newly named type.
+With this syntax, you can create a new type and decorate a value
+as follows
+```
+<value> ( <identifier> = ( )<type> ) )
+```
+e.g.,
+```
+80 (port=(uint16))
+````
+is the value 80 of type "port", where "port" is a type name bound to `uint16`.
 
-A type definition may also appear inside of decorator as in
-```
-( <type> (= <identifier> ))
-```
+The abbreviated form `(=<identifier>)` may be used whenever a type value is
+_self describing_ in the sense that its type name can be entirely derived
+from its value, e.g., a record type can be derived from a record value
+because all of the field names and type names are present in the value, but
+an enum type cannot be derived from an enum value because not all the enumerated
+names are present in the value.  In the the latter case, the long form
+`(<identifier>=(<type>))` must be used.
 
 It is an error for an external type to be defined to a different type
 than its previous definition though multiple definitions of the same
 type are legal (thereby allowing for concatenation of otherwise
-indepdent sequences).
+independent sequences).
 
 ### 3.3 Primitive Values
 
@@ -405,10 +436,15 @@ where `<name>` is either an identifier or a quoted string and `<value>` is
 any optionally-decorated ZSON value inclusive of other records.
 There may be zero or more key/values pairs.
 
-Any of the field values of a record may have an ambiguous type, in which case
+Any value of a field may have an ambiguous type, in which case
 the record value must include a decorator, e.g., of the form
 ```
 { <name> : <value>, <name> : <value>, ... } ( <decorator> )
+```
+Similarly, a record value may omit the field names when decorated with
+a record type value:
+```
+{ <value>, <value>, ... } ( <decorator> )
 ```
 
 #### 3.4.2 Array Value
@@ -478,21 +514,23 @@ enums may be defined as set of values of an arbitrary type.
 
 An enum value has the form
 ```
-<identifier>
+<name>
 ```
-where the indicated identifier is the name of one of the enum elements.
+where the name is either an identifier or a quoted string and it uniquely
+names one of the enum elements.
 
 Such a value must appear in a context where the enum type is known, i.e.,
 with an explicit enum type decorator or within a complex type where the
 contained enum type is defined by the complex type.
 
-When a string `true`, `false`, or `null` is intended as an enum value,
-a type decorator of the corresponding enum type is required to resolve
-the ambiguity, e.g.,
+When an enum name is `true`, `false`, or `null`, it must be quoted.
+
+A sequence of enum values might look like this:
 ```
-true (<true,false,unknown>)
+HEADS (flip=(<HEADS,TAILS>))
+TAILS (flip)
+HEADS (flip)
 ```
-is an enum value of the indicated enum and is not the boolean value `true`.
 
 #### 3.4.6 Map Value
 
@@ -506,21 +544,44 @@ map type, or two elements referring to the type of the keys and type of the valu
 A map value may be empty.  An empty map value without a type decorator is
 presumed to be an empty map of type (`null`, `null`).
 
-### 3.5 Type Value
+#### 3.4.7 Type Value
 
-The syntax of a type value or of a decorator expressed as a type value mirrors
-the value syntax.
+The type of a type value is `type` while its value is depicted by parenthesizing
+its type description (as defined in [Section 3.5](#35-type-syntax).  For example,
+a type value of a record with a single field called `t` of type `type` would look
+like this:
+```
+{ t: (string) (type) }
+```
+Since type values have implied types, the `type` type decorator can be omitted:
+```
+{ t: (string) }
+```
+Now supposing we created a second field called `t2` whose type is
+computed by introspecting the type of `t`.  This result is
+```
+{
+    t: (string),
+    t2: (type)
+}
+```
 
-A primitive type value is the name of the primitive type, i.e., `string`,
+### 3.5 Type Syntax
+
+The syntax of a type mirrors the value syntax.
+
+A primitive type is the name of the primitive type, i.e., `string`,
 `uint16`, etc.
 
-The syntax of complex type values parallels the syntax of complex values.
+The syntax of complex types parallels the syntax of complex values.
 
-A _record type value_ has the form:
+#### 3.5.1 Record Type
+
+A _record type_ has the form:
 ```
 { <name> : <type>, <name> : <type>, ... }
 ```
-where `<type>` is any type value.  The order of the columns is significant,
+where `<type>` is any type.  The order of the columns is significant,
 e.g., type `{a:int32,b:int32}` is distinct from type `{b:int32,a:int32}`.
 In contrast to schema abstractions in other formats, ZSON has no way to mark
 a field optional as all fields are, in a sense optional: any field can be
@@ -528,30 +589,31 @@ encoded with a null value.  If an instance of a record value omits a value
 by dropping the field altogether rather than using a null, then that record
 value corresponds to a different record type that elides the field in question.
 
-An _array type value_ has the form:
+#### 3.5.2 Array Type
+
+An _array type_ has the form:
 ```
 [ <type> ]
 ```
 
-A _set type value_ has the form:
+#### 3.5.3 Set Type
+
+A _set type_ has the form:
 ```
 |[ <type> ]|
 ```
 
-A _map type value_ has the form:
-```
-|{ <key-type>, <value-type> }|
-```
-where `<key-type>` is any type value of the keys and `<value-type>` is any
-type value of the values.
+#### 3.5.4 Union Type
 
-A _union type value_ has the form:
+A _union type_ has the form:
 ```
 ( <type>, <type>, ... )
 ```
 where there are at least two types in the list.
 
-An _enum type value_ has two forms.  The simple form is:
+#### 3.5.5 Enum Type
+
+An _enum type_ has two forms.  The simple form is:
 ```
 < <identifier>, <identifier>, ... >
 ```
@@ -562,6 +624,24 @@ and the complex form is:
 In the same form, the underlying enum value is equal to its positional
 index in the list of identifiers as an uint64 type.
 
+#### 3.5.6 Map Type
+
+A _map type_ has the form:
+```
+|{ <key-type>, <value-type> }|
+```
+where `<key-type>` is the type of the keys and `<value-type>` is the
+type of the values.
+
+#### 3.5.7 Type Type
+
+The "type" type represents value and its syntax is simply `type`.
+
+#### 3.5.8 Named Type
+
+Any type name created with a type definition is referred to
+simply with the same identifier used in its definition.
+
 Type values may refer to external type tames and may elide the definition
 fo the external type when the type definition for that name is known,
 e.g., if `conn` is a type name, then
@@ -570,14 +650,14 @@ e.g., if `conn` is a type name, then
 ```
 is an array of elements of type `conn`.
 
-The canonical form a type value includes the definition of any referenced
-type using the decorator syntax:
+The canonical form a type value includes the definitions of any and all referenced
+types in the value using the embedded type definition syntax:
 ```
-<type> ( <name> )
+<name> = ( <type> )
 ```
-where `<name>` is the external name of the type, e.g.,
+where `<name>` is a string or integer, e.g.,
 ```
-{ info:string, src:{ addr:ip, port:uint16 } (socket), dst:socket } (conn)
+conn=({ info:string, src:(socket=({ addr:ip, port:uint16 }), dst:socket })
 ```
 Types in canonical form can be decoded and interpreted independently
 of a type context.
@@ -606,84 +686,163 @@ defined by ZSON.
     uid: "C1zOivgBT6dBmknqk" (bstring),
     id: {
         orig_h: 10.47.1.152,
-        orig_p: 49562 (uint16) (=port),
+        orig_p: 49562 (port=(uint16)),
         resp_h: 23.217.103.245,
         resp_p: 80 (port)
-    } (=24),
+    } (=0),
     proto: "tcp" (=zenum),
     service: null (bstring),
     duration: 9.698493s (duration),
     orig_bytes: 0 (uint64),
     resp_bytes: 90453565 (uint64),
     conn_state: "SF" (bstring),
-    local_orig: null (bool),
-    local_resp: null (bool),
+    local_orig: null,
+    local_resp: null,
     missed_bytes: 0 (uint64),
     history: "^dtAttttFf" (bstring),
     orig_pkts: 57490 (uint64),
     orig_ip_bytes: 2358856 (uint64),
     resp_pkts: 123713 (uint64),
     resp_ip_bytes: 185470730 (uint64),
-    tunnel_parents: null (|[bstring]| (=25))
-} (=26)
+    tunnel_parents: null (=1)
+} (=2)
 {
     _path: "conn",
-    ts: 2018-03-24T17:15:20.605945Z,
-    uid: "CayJxr1WvNLdJ6L9B4",
+    ts: 2018-03-24T17:15:20.6008Z,
+    uid: "CfbnHCmClhWXY99ui",
     id: {
         orig_h: 10.128.0.207,
-        orig_p: 8,
-        resp_h: 10.47.23.178,
-        resp_p: 0
+        orig_p: 13,
+        resp_h: 10.47.19.254,
+        resp_p: 14
     },
     proto: "icmp",
     service: null,
-    duration: 4µs,
-    orig_bytes: 0,
+    duration: 1.278ms,
+    orig_bytes: 336,
     resp_bytes: 0,
     conn_state: "OTH",
     local_orig: null,
     local_resp: null,
     missed_bytes: 0,
     history: null,
-    orig_pkts: 2,
-    orig_ip_bytes: 56,
+    orig_pkts: 28,
+    orig_ip_bytes: 1120,
     resp_pkts: 0,
     resp_ip_bytes: 0,
     tunnel_parents: null
-} (26)
+} (2)
 ```
 
 ### enum
 
 ```
-{ rank: A (<2,3,4,5,6,7,8,9,10,Jack,Queen,King,Ace>), suit: H (<Hearts,Diamonds,Spaces,Clubs>) } (=card)
+{ rank: Ace (24=(<Two,Three,Four,Five,Six,Seven,Eight,Nine,Ten,Jack,Queen,King,Ace>)), suit: H (25=(<Hearts,Diamonds,Spaces,Clubs>)) } (=card)
+
 ```
 is the same as
 ```
-{ rank: A, suit:H } ({rank: <2,3,4,5,6,7,8,9,10,Jack,Queen,King,Ace>, suit:<Hearts,Diamonds,Spaces,Clubs>}) (=card)
+{ rank: Ace, suit:H } (card=({rank: <Two,Three,Four,Five,Six,Seven,Eight,Nine,Ten,Jack,Queen,King,Ace>, suit:<Hearts,Diamonds,Spaces,Clubs>}))
 ```
 
 ### union
 
 ```
-{ u: 12 (int32, string, {a:int8,b:ip} (=27), |[27]| ) } (=28) (=ex_union)
-{ u: "foo" } (=ex_union)
-```
-is the same as
-```
-{ u: 12 (int32, string, {a:int8,b:ip} (=27)), |[27]| } (=28) (=rec_with_union)
-{ u: "foo" } (rec_with_union)
+{ u: 12 (int32, string, (0=({a:int8,b:ip}), |[0]| ) } (=union_ex)
+{ u: "foo" } (union_ex)
+{ u: |[ {123,10.0.0.1}, {345,10.0.0.1} ]| } (union_ex)
 ```
 
 If you have a set of two different types inside of a union that "look the same" then you don't
 know which is which so you need a type decorator to distinguish....
 ```
-{ u: |[12, 13 ]| (int8) (=26) (26, |[int16]| (=27)) (=28) } (=29) (=union_ex2)
+{ u: |[12, 13 ]| (28=(26=(|[int8])) (26, (27=(|[int16]|)))) } (=union_ex2)
 { u: |[14, 15 ]| (27) } (union_ex2)
 ```
 is the same as
 ```
-{ u: |[12, 13 ]| (int8) (|[int8]|, |[int16]| } (=29) (=union_ex2)
-{ u: |[14, 15 ]| (int16) } (union_ex2)
+{ u: |[12 (int8), 13 ]| (|[int8]|, |[int16]| } (=union_ex2)
+{ u: |[14 (int16), 15 ]| } (union_ex2)
+```
+
+## 5. Grammar
+
+Here is a left-recursive pseudo-grammar of ZSON.  Note that not all
+grammars are semantically valid as type mismatches may arise.
+For example, union and enum values must both appear in a context
+the defines their type.
+
+```
+<zson> = <zson> <eos> <dec-value> | <zson> <dec-value> | <dec-value>
+
+<eos> = .
+
+<value> = <primary> | <primary> <decorator>
+
+<primary> = <primitive> | <record> | <array> | <set> |
+            <union> | <enum> | <map> | <type-val>
+
+<primitive> = primitive value as defined above
+
+<record> = "{" <flist> "}"  |  "{"  "}"
+
+<flist> = <flist> "," <field> | <field>
+
+<field> = <field-name> ":" <value> | <value>
+
+<field-name> = <identifier> | <quoted-string>
+
+<quoted-string> = quoted string as defined above
+
+<identifier> = as defined above
+
+<array> = "[" <vlist> "]"  |  "["  "]"
+
+<vlist> = <vlist> "," <value> | <value>
+
+<set> = "|[" <vlist> "]|"  |  "|["  "]|"
+
+<union> = <value>
+
+<enum> = <field-name>
+
+<map> = "|{" <mlist> "}|"  |  "|{"  "}|"
+
+mlist = <mvalue> | <mlist>
+
+mvalue = "{" <value> "," <value> "}"
+
+<type-value> = <type-type>
+
+<decorator> = "(" <type> ")" | "(" "=" <type-name> ")"
+
+<type> = <primitive-type> | <record-type> | <array-type> | <set-type> |
+            <union-type> | <enum-type> | <map-type> | <type-type> |
+            <type-def> | <type-name>
+
+<primitive-type> = uint8 | uint16 | etc as defined above excepting "type"
+
+<record-type> = "{" <tflist> "}"  |  "{" "}"
+
+<tflist> = <tflist> "," <tfield> | <tfield>
+
+<tfield> = <field-name> ":" <type>
+
+<array-type> = "[" <type> "]"  |  "[" "]"
+
+<set-type> = "|[" <type> "]|"  |  "|[" "]|"
+
+<union-type> = "(" <type> "," <tlist> ")"
+
+<tlist> = <tlist> "," <type> | <type>
+
+<enum-type> = "<" <flist> ">"
+
+<map-type> = "{" <type> "," <type> "}"
+
+<type-type> = "(" <type> ")"
+
+<type-def> = <identifier> = <type-type>
+
+<type-name> = <identifier> | <integer>
 ```

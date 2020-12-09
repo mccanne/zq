@@ -4,7 +4,7 @@ script: |
   zar import -R logs -data s3://bucket/zartest babble.tzng
   zar ls -R logs -ranges
   echo ===
-  zar stat -R logs -f zng | zq -t "cut -c log_id" -
+  zar stat -R logs -f zng | zq -t "drop log_id" -
 
 inputs:
   - name: babble.tzng

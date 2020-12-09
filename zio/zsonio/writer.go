@@ -1,28 +1,31 @@
 package zsonio
 
 import (
-	"encoding/hex"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
-	"time"
 
 	"github.com/brimsec/zq/zcode"
 	"github.com/brimsec/zq/zng"
 	"github.com/brimsec/zq/zng/resolver"
+	"github.com/brimsec/zq/zson"
 )
 
 type Writer struct {
 	writer      io.WriteCloser
 	zctx        *resolver.Context
 	mapper      *resolver.Mapper
-	tags        typemap
+	typedefs    typemap
 	tab         int
 	newline     string
 	whitespace  string
 	typeTab     int
 	typeNewline string
+	nid         int
+	types       *zson.TypeTable
 }
 
 type WriterOpts struct {
@@ -38,7 +41,7 @@ func NewWriter(w io.WriteCloser, opts WriterOpts) *Writer {
 	return &Writer{
 		zctx:       zctx,
 		writer:     w,
-		tags:       make(typemap),
+		typedefs:   make(typemap),
 		tab:        opts.Pretty,
 		newline:    newline,
 		whitespace: strings.Repeat(" ", 80),
@@ -55,76 +58,90 @@ func (w *Writer) Write(rec *zng.Record) error {
 	if err != nil {
 		return err
 	}
-	known := w.tags.exists(typ)
-	if err := w.writeValue(0, typ, rec.Raw, known); err != nil {
+	if err := w.writeValueAndDecorate(typ, rec.Raw); err != nil {
 		return err
-	}
-	if known {
-		if err := w.writef(" (%s)", w.tags.lookup(typ)); err != nil {
-			return err
-		}
 	}
 	return w.write("\n")
 }
 
-func (w *Writer) writeValue(indent int, typ zng.Type, bytes zcode.Bytes, known bool) error {
+func (w *Writer) writeValueAndDecorate(typ zng.Type, bytes zcode.Bytes) error {
+	known := w.typedefs.exists(typ)
+	if err := w.writeValue(0, typ, bytes, known, false); err != nil {
+		return err
+	}
+	return w.decorate(typ, false)
+}
+
+func (w *Writer) writeValue(indent int, typ zng.Type, bytes zcode.Bytes, parentKnown, decorate bool) error {
+	known := parentKnown || w.typedefs.exists(typ)
 	if bytes == nil {
 		if err := w.write("null"); err != nil {
-			if err != nil {
-				return err
-			}
+			return err
 		}
-		return w.writeDecorator(typ, known, true)
+		return w.decorate(typ, parentKnown)
 	}
 	var err error
 	switch t := typ.(type) {
-	//XXX Need enum support. See #1676.
 	default:
-		err = w.writePrimitive(indent, typ, bytes)
+		err = w.write(typ.ZSONOf(bytes))
 	case *zng.TypeAlias:
-		childKnown := known
-		if !childKnown {
-			childKnown = w.tags.exists(typ)
-		}
-		if err := w.writeValue(indent, t.Type, bytes, childKnown); err != nil {
+		if err := w.writeValue(indent, t.Type, bytes, known, false); err != nil {
 			return err
 		}
-		if known {
-			return nil
-		}
-		return w.writef(" (%s)", w.tags.lookupAlias(typ, t.Name))
 	case *zng.TypeRecord:
-		err = w.writeRecord(indent, t, bytes)
+		err = w.writeRecord(indent, t, bytes, known)
 	case *zng.TypeArray:
-		err = w.writeVector(indent, "[", "]", t.Type, zng.Value{t, bytes})
+		err = w.writeVector(indent, "[", "]", t.Type, zng.Value{t, bytes}, known)
 	case *zng.TypeSet:
-		err = w.writeVector(indent, "|[", "]|", t.Type, zng.Value{t, bytes})
+		err = w.writeVector(indent, "|[", "]|", t.Type, zng.Value{t, bytes}, known)
 	case *zng.TypeUnion:
-		err = w.writeUnion(indent, t, bytes, known)
+		err = w.writeUnion(indent, t, bytes)
 	case *zng.TypeMap:
-		err = w.writeMap(indent, t, bytes)
+		err = w.writeMap(indent, t, bytes, known)
+	case *zng.TypeEnum:
+		err = w.write(t.ZSONOf(bytes))
+	case *zng.TypeOfType:
+		err = w.writef("(%s)", string(bytes))
 	}
-	if err == nil {
-		err = w.writeDecorator(typ, known, false)
+	if err == nil && decorate {
+		err = w.decorate(typ, parentKnown)
 	}
 	return err
 }
 
-func (w *Writer) writeDecorator(typ zng.Type, known, null bool) error {
-	if known || (!null && impliedPrimitive(typ)) {
-		return nil
-	}
-	return w.writef(" (%s)", w.tags.lookup(typ))
+func (w *Writer) nextInternalType() string {
+	name := strconv.Itoa(w.nid)
+	w.nid++
+	return name
 }
 
-func (w *Writer) writeRecord(indent int, typ *zng.TypeRecord, bytes zcode.Bytes) error {
+func (w *Writer) decorate(typ zng.Type, known bool) error {
+	if known || zson.Implied(typ) {
+		return nil
+	}
+	if name, ok := w.typedefs[typ]; ok {
+		return w.writef(" (%s)", name)
+	}
+	if zson.SelfDescribing(typ) {
+		var name string
+		if typ, ok := typ.(*zng.TypeAlias); ok {
+			name = typ.Name
+		} else {
+			name = w.nextInternalType()
+		}
+		w.typedefs[typ] = name
+		return w.writef(" (=%s)", name)
+	}
+	return w.writef(" (%s)", w.lookupType(typ))
+}
+
+func (w *Writer) writeRecord(indent int, typ *zng.TypeRecord, bytes zcode.Bytes, known bool) error {
 	if err := w.write("{"); err != nil {
 		return err
 	}
 	if len(typ.Columns) == 0 {
 		return w.write("}")
 	}
-	known := w.tags.exists(typ)
 	indent += w.tab
 	sep := w.newline
 	it := bytes.Iter()
@@ -139,13 +156,13 @@ func (w *Writer) writeRecord(indent int, typ *zng.TypeRecord, bytes zcode.Bytes)
 		if err := w.write(sep); err != nil {
 			return err
 		}
-		if err := w.indent(indent, field.Name); err != nil {
+		if err := w.indent(indent, zng.QuotedName(field.Name)); err != nil {
 			return err
 		}
 		if err := w.write(": "); err != nil {
 			return err
 		}
-		if err := w.writeValue(indent, field.Type, bytes, known); err != nil {
+		if err := w.writeValue(indent, field.Type, bytes, known, true); err != nil {
 			return err
 		}
 		sep = "," + w.newline
@@ -156,7 +173,7 @@ func (w *Writer) writeRecord(indent int, typ *zng.TypeRecord, bytes zcode.Bytes)
 	return w.indent(indent-w.tab, "}")
 }
 
-func (w *Writer) writeVector(indent int, open, close string, inner zng.Type, zv zng.Value) error {
+func (w *Writer) writeVector(indent int, open, close string, inner zng.Type, zv zng.Value, known bool) error {
 	if err := w.write(open); err != nil {
 		return err
 	}
@@ -181,7 +198,7 @@ func (w *Writer) writeVector(indent int, open, close string, inner zng.Type, zv 
 		if err := w.indent(indent, ""); err != nil {
 			return err
 		}
-		if err := w.writeValue(indent, inner, bytes, true); err != nil {
+		if err := w.writeValue(indent, inner, bytes, known, true); err != nil {
 			return err
 		}
 		sep = "," + w.newline
@@ -192,20 +209,24 @@ func (w *Writer) writeVector(indent int, open, close string, inner zng.Type, zv 
 	return w.indent(indent-w.tab, close)
 }
 
-func (w *Writer) writeUnion(indent int, union *zng.TypeUnion, bytes zcode.Bytes, known bool) error {
+func (w *Writer) writeUnion(indent int, union *zng.TypeUnion, bytes zcode.Bytes) error {
 	typ, _, bytes, err := union.SplitZng(bytes)
 	if err != nil {
 		return err
 	}
-	// XXX For now, we always write the dectorator of a union value so that
+	// XXX For now, we always decorate a union value so that
 	// we can determine the selector from the value's explicit type.
-	// We will later optimize this so we only print the dectorator if its
+	// We can later optimize this so we only print the decorator if its
 	// ambigous with another type (e.g., int8 and int16 vs a union of int8 and string).
-	known = false
-	return w.writeValue(indent, typ, bytes, known)
+	// Let's do this after we have the parser working and capable of this
+	// disambiguation.  See issue #1764.
+	// In other words, just because we known the union's type doesn't mean
+	// we know the type of a particular value of that union.
+	known := false
+	return w.writeValue(indent, typ, bytes, known, true)
 }
 
-func (w *Writer) writeMap(indent int, typ *zng.TypeMap, bytes zcode.Bytes) error {
+func (w *Writer) writeMap(indent int, typ *zng.TypeMap, bytes zcode.Bytes, known bool) error {
 	if err := w.write("|{"); err != nil {
 		return err
 	}
@@ -232,15 +253,13 @@ func (w *Writer) writeMap(indent int, typ *zng.TypeMap, bytes zcode.Bytes) error
 		if err := w.indent(indent, "{"); err != nil {
 			return err
 		}
-		known := w.tags.known(typ.KeyType)
-		if err := w.writeValue(indent+w.tab, typ.KeyType, keyBytes, known); err != nil {
+		if err := w.writeValue(indent+w.tab, typ.KeyType, keyBytes, known, true); err != nil {
 			return err
 		}
 		if err := w.write(","); err != nil {
 			return err
 		}
-		known = w.tags.known(typ.ValType)
-		if err := w.writeValue(indent+w.tab, typ.ValType, valBytes, known); err != nil {
+		if err := w.writeValue(indent+w.tab, typ.ValType, valBytes, known, true); err != nil {
 			return err
 		}
 		if err := w.write("}"); err != nil {
@@ -252,80 +271,6 @@ func (w *Writer) writeMap(indent int, typ *zng.TypeMap, bytes zcode.Bytes) error
 		return err
 	}
 	return w.indent(indent-w.tab, "}|")
-}
-
-func (w *Writer) writePrimitive(indent int, typ zng.Type, bytes zcode.Bytes) error {
-	// TBD: This is placeholder formatting logic until a method on zng.Type
-	// is available that produces a ZSON-formatted string.  See issue #1723.
-	switch typ.(type) {
-	default:
-		zv := zng.Value{typ, bytes} //XXX
-		if err := w.write(zv.Format(zng.OutFormatZNG)); err != nil {
-			return err
-		}
-	case *zng.TypeOfBool:
-		s := "false"
-		if zng.IsTrue(bytes) {
-			s = "true"
-		}
-		return w.write(s)
-	case *zng.TypeOfTime:
-		t, err := zng.DecodeTime(bytes)
-		if err != nil {
-			return err
-		}
-		b := t.Time().Format(time.RFC3339Nano)
-		return w.write(string(b))
-
-	case *zng.TypeOfDuration:
-		ns, err := zng.DecodeDuration(bytes)
-		if err != nil {
-			return err
-		}
-		return w.write(time.Duration(ns).String())
-
-	case *zng.TypeOfBytes:
-		if err := w.write("0x"); err != nil {
-			return err
-		}
-		if err := w.write(string(hex.EncodeToString(bytes))); err != nil {
-			return err
-		}
-	case *zng.TypeOfString, *zng.TypeOfBstring, *zng.TypeOfError:
-		if err := w.write("\""); err != nil {
-			return err
-		}
-		//XXX Need to properly escape quoted string (issue #1677)
-		zv := zng.Value{typ, bytes} //XXX
-		if err := w.write(zv.Format(zng.OutFormatZNG)); err != nil {
-			return err
-		}
-		if err := w.write("\""); err != nil {
-			return err
-		}
-	case *zng.TypeOfType:
-		// XXX This should change to a lookup in the foreign context
-		// using the zcode.Bytes as the key, and when there's a miss,
-		// allocating the type in the local context, all while handling
-		// aliases.  See issue #1675.
-		typ, err := w.zctx.LookupByName(string(bytes))
-		if err != nil {
-			//return err
-			// XXX Until #1675 is resolved, emit the old
-			// TZNG type name and flag it as problematic.
-			w.write("TZNG[")
-			w.write(string(bytes))
-			w.write("]")
-			return nil
-
-		}
-		if w.typeTab == 0 {
-			indent = 0
-		}
-		return w.writeType(indent, typ)
-
-	}
-	return nil
 }
 
 func (w *Writer) indent(tab int, s string) error {
@@ -350,10 +295,121 @@ func (w *Writer) writef(s string, args ...interface{}) error {
 	return err
 }
 
-func impliedPrimitive(typ zng.Type) bool {
-	switch typ.(type) {
-	case *zng.TypeOfInt64, *zng.TypeOfTime, *zng.TypeOfFloat64, *zng.TypeOfBool, *zng.TypeOfBytes, *zng.TypeOfString, *zng.TypeOfIP, *zng.TypeOfNet:
-		return true
+// lookupType returns the type string for the given type embedding any
+// needed typedefs for aliases that have not been previously defined.
+// These typedefs use the embedded syntax (name=(type-string)).
+// Typedefs handled by decorators are handled in decorate().
+func (w *Writer) lookupType(typ zng.Type) string {
+	if name, ok := w.typedefs[typ]; ok {
+		return name
 	}
-	return false
+	if alias, ok := typ.(*zng.TypeAlias); ok {
+		// We don't check here for typedefs that illegally change
+		// the type of a type name as we build this output from
+		// the internal type system which should not let this happen.
+		name := alias.Name
+		w.typedefs[typ] = name
+		body := w.lookupType(alias.Type)
+		return fmt.Sprintf("%s=(%s)", name, body)
+	}
+	if typ.ID() < zng.IdTypeDef {
+		name := typ.String()
+		w.typedefs[typ] = name
+		return name
+	}
+	name := w.nextInternalType()
+	body := w.formatType(typ)
+	w.typedefs[typ] = name
+	return fmt.Sprintf("%s=(%s)", name, body)
+}
+
+func (w *Writer) formatType(typ zng.Type) string {
+	if name, ok := w.typedefs[typ]; ok {
+		return name
+	}
+	switch typ := typ.(type) {
+	case *zng.TypeAlias:
+		// Aliases are handled differently above to determine the
+		// plain form vs embedded typedef.
+		panic("alias shouldn't be formatted")
+	case *zng.TypeRecord:
+		return w.formatRecord(typ)
+	case *zng.TypeArray:
+		return fmt.Sprintf("[%s]", w.lookupType(typ.Type))
+	case *zng.TypeSet:
+		return fmt.Sprintf("|[%s]|", w.lookupType(typ.Type))
+	case *zng.TypeMap:
+		return fmt.Sprintf("|{%s,%s}|", w.lookupType(typ.KeyType), w.lookupType(typ.ValType))
+	case *zng.TypeUnion:
+		return w.formatUnion(typ)
+	case *zng.TypeEnum:
+		return w.formatEnum(typ)
+	case *zng.TypeOfType:
+		return typ.ZSON()
+	}
+	panic("unknown case in formatType(): " + typ.String())
+}
+
+func (w *Writer) formatRecord(typ *zng.TypeRecord) string {
+	var s strings.Builder
+	var sep string
+	s.WriteString("{")
+	for _, col := range typ.Columns {
+		s.WriteString(sep)
+		s.WriteString(zng.QuotedName(col.Name))
+		s.WriteString(":")
+		s.WriteString(w.lookupType(col.Type))
+		sep = ","
+	}
+	s.WriteString("}")
+	return s.String()
+}
+
+func (w *Writer) formatUnion(typ *zng.TypeUnion) string {
+	var s strings.Builder
+	sep := ""
+	s.WriteString("(")
+	for _, typ := range typ.Types {
+		s.WriteString(sep)
+		s.WriteString(w.lookupType(typ))
+		sep = ","
+	}
+	s.WriteString(")")
+	return s.String()
+}
+
+// XXX This needs a refactor.  The type formatter needs to be be able to format
+// a value for enum but the Writer type presume values are "written" not "formatter".
+// This hack works with a bytes.Buffer works around this.  Also, when we are writing
+// enum values inside of a type, we don't want the pretty printing so the refactor
+// will allow you to specify indent on a per-format basis.  See issue #1763.
+
+type nopCloser struct {
+	bytes.Buffer
+}
+
+func (*nopCloser) Close() error {
+	return nil
+}
+
+func (w *Writer) formatEnum(typ *zng.TypeEnum) string {
+	save := w.writer
+	b := &nopCloser{}
+	w.writer = b
+	sep := ""
+	w.write("<")
+	inner := typ.Type
+	for k, elem := range typ.Elements {
+		w.write(sep)
+		w.writef("%s:", zng.QuotedName(elem.Name))
+		known := k != 0
+		if err := w.writeValue(0, inner, elem.Value, known, true); err != nil {
+			//XXX See comment above about refactor.
+			return err.Error()
+		}
+		sep = ","
+	}
+	w.write(">")
+	w.writer = save
+	return b.String()
 }

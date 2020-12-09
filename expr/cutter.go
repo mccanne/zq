@@ -1,199 +1,152 @@
 package expr
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/brimsec/zq/field"
 	"github.com/brimsec/zq/zng"
 	"github.com/brimsec/zq/zng/builder"
 	"github.com/brimsec/zq/zng/resolver"
+	"github.com/brimsec/zq/zng/typevector"
 )
-
-// A cutBuilder keeps the data structures needed for cutting one
-// particular type of input record.
-type cutBuilder struct {
-	resolvers []Evaluator
-	builder   *builder.ColumnBuilder
-	outType   *zng.TypeRecord
-}
-
-// cut returns a new record value from input record using the provided
-// cutBuilder, or nil if the record can't be cut.
-func (cb *cutBuilder) cut(in *zng.Record) *zng.Record {
-	cb.builder.Reset()
-	for _, resolver := range cb.resolvers {
-		val, _ := resolver.Eval(in)
-		cb.builder.Append(val.Bytes, val.IsContainer())
-	}
-	zv, err := cb.builder.Encode()
-	if err != nil {
-		// XXX internal error, what to do...
-		return nil
-	}
-	return zng.NewRecord(cb.outType, zv)
-}
 
 type Cutter struct {
 	zctx        *resolver.Context
-	complement  bool
-	cutBuilders map[int]*cutBuilder
-	fields      []field.Static
-	resolvers   []Evaluator
-	strict      bool
+	builder     *builder.ColumnBuilder
+	fieldRefs   []field.Static
+	fieldExprs  []Evaluator
+	typeCache   []zng.Type
+	outTypes    *typevector.Table
+	recordTypes map[int]*zng.TypeRecord
+
+	droppers     []*Dropper
+	dropperCache []*Dropper
+	dirty        bool
 }
 
 // NewCutter returns a Cutter for fieldnames. If complement is true,
 // the Cutter copies fields that are not in fieldnames. If complement
 // is false, the Cutter copies any fields in fieldnames, where targets
 // specifies the copied field names.
-func NewCutter(zctx *resolver.Context, complement bool, lhs []field.Static, rhs []Evaluator) *Cutter {
+func NewCutter(zctx *resolver.Context, fieldRefs []field.Static, fieldExprs []Evaluator) (*Cutter, error) {
+	b, err := builder.NewColumnBuilder(zctx, fieldRefs)
+	if err != nil {
+		return nil, err
+	}
 	return &Cutter{
 		zctx:        zctx,
-		complement:  complement,
-		fields:      lhs,
-		resolvers:   rhs,
-		cutBuilders: make(map[int]*cutBuilder),
-	}
+		builder:     b,
+		fieldRefs:   fieldRefs,
+		fieldExprs:  fieldExprs,
+		typeCache:   make([]zng.Type, len(fieldRefs)),
+		outTypes:    typevector.NewTable(),
+		recordTypes: make(map[int]*zng.TypeRecord),
+	}, nil
 }
 
-// NewStrictCutter is like NewCutter but, if complement is false, (*Cutter).Cut
-// returns a record only if its input record contains all of the fields in lhs.
-func NewStrictCutter(zctx *resolver.Context, complement bool, lhs []field.Static, rhs []Evaluator) *Cutter {
-	c := NewCutter(zctx, complement, lhs, rhs)
-	c.strict = true
-	return c
+func (c *Cutter) AllowPartialCuts() {
+	n := len(c.fieldRefs)
+	c.droppers = make([]*Dropper, n)
+	c.dropperCache = make([]*Dropper, n)
 }
 
 func (c *Cutter) FoundCut() bool {
-	for _, ci := range c.cutBuilders {
-		if ci != nil {
-			return true
-		}
-	}
-	return false
+	return c.dirty
 }
 
-// complementBuilder creates a builder for the complement form of cut, where a
-// all fields not in a set are to be cut from a record and passed on.
-func (c *Cutter) complementBuilder(r *zng.Record) (*cutBuilder, error) {
-	fields, fieldTypes := complementFields(c.fields, nil, r.Type)
-	// if the set of cut -c fields is equal to the set of record
-	// fields, then there is no output for this input type.
-	if len(fieldTypes) == 0 {
-		return nil, nil
-	}
-
-	var resolvers []Evaluator
-	for _, f := range fields {
-		resolvers = append(resolvers, NewDotExpr(f))
-	}
-
-	builder, err := builder.NewColumnBuilder(c.zctx, fields)
-	if err != nil {
-		return nil, err
-	}
-	cols := builder.TypedColumns(fieldTypes)
-	outType, err := c.zctx.LookupTypeRecord(cols)
-	if err != nil {
-		return nil, err
-	}
-	return &cutBuilder{resolvers, builder, outType}, nil
-}
-
-// complementFields returns the slice of fields and associated types
-// that make up the complement of the set of fields in drops.
-func complementFields(drops []field.Static, prefix field.Static, typ *zng.TypeRecord) ([]field.Static, []zng.Type) {
-	var fields []field.Static
-	var types []zng.Type
-	for _, c := range typ.Columns {
-		if contains(drops, append(prefix, c.Name)) {
-			continue
-		}
-		if typ, ok := c.Type.(*zng.TypeRecord); ok {
-			innerFields, innerTypes := complementFields(drops, append(prefix, c.Name), typ)
-			fields = append(fields, innerFields...)
-			types = append(types, innerTypes...)
-			continue
-		}
-		fields = append(fields, append(prefix, c.Name))
-		types = append(types, c.Type)
-	}
-	return fields, types
-}
-
-func contains(ss []field.Static, el field.Static) bool {
-	for _, s := range ss {
-		if s.Equal(el) {
-			return true
-		}
-	}
-	return false
-}
-
-// setBuilder creates a builder for the regular form of cut, where a
-// set of fields are to be cut from a record and passed on.
-//
-// Note that unlike for the complement form, we don't strictly need a
-// different columnbuilder or set of resolvers per input type
-// here. (We do need a different outType). Since the number of
-// different input types is small wrt the number of input records, the
-// optimization consisting of having a single columnbuilder and
-// resolver set doesn't seem worth the added special casing.
-func (c *Cutter) setBuilder(r *zng.Record) (*cutBuilder, error) {
-	// Build up the output type.
-	var fields []field.Static
-	var resolvers []Evaluator
-	var outColTypes []zng.Type
-	for i, resolver := range c.resolvers {
-		val, err := resolver.Eval(r)
-		if err != nil || val.Type == nil {
-			// The field is absent, so for this input type, ...
-			if c.strict {
-				// ...produce no output.
-				return nil, nil
-			}
-			// ...omit the field from the output.
-			continue
-		}
-		fields = append(fields, c.fields[i])
-		resolvers = append(resolvers, resolver)
-		outColTypes = append(outColTypes, val.Type)
-	}
-	if len(fields) == 0 {
-		return nil, nil
-	}
-	builder, err := builder.NewColumnBuilder(c.zctx, fields)
-	if err != nil {
-		return nil, err
-	}
-	cols := builder.TypedColumns(outColTypes)
-	outType, err := c.zctx.LookupTypeRecord(cols)
-	if err != nil {
-		return nil, err
-	}
-	return &cutBuilder{resolvers, builder, outType}, nil
-}
-
-func (c *Cutter) builder(r *zng.Record) (*cutBuilder, error) {
-	if c.complement {
-		return c.complementBuilder(r)
-	}
-	return c.setBuilder(r)
-}
-
-// Cut returns a new record comprising fields copied from in according to the
-// receiver's configuration.  If the resulting record would be empty, Cut
+// Apply returns a new record comprising fields copied from in according to the
+// receiver's configuration.  If the resulting record would be empty, Apply
 // returns nil.
-func (c *Cutter) Cut(in *zng.Record) (*zng.Record, error) {
-	cb, ok := c.cutBuilders[in.Type.ID()]
-	if !ok {
-		var err error
-		cb, err = c.builder(in)
+func (c *Cutter) Apply(in *zng.Record) (*zng.Record, error) {
+	types := c.typeCache
+	b := c.builder
+	b.Reset()
+	droppers := c.dropperCache[:0]
+	for k, e := range c.fieldExprs {
+		zv, err := e.Eval(in)
+		if err != nil {
+			if err == ErrNoSuchField {
+				if c.droppers != nil {
+					if c.droppers[k] == nil {
+						c.droppers[k] = NewDropper(c.zctx, c.fieldRefs[k:k+1])
+					}
+					droppers = append(droppers, c.droppers[k])
+					// ignore this record
+					b.Append(zv.Bytes, false)
+					types[k] = zng.TypeNull
+					continue
+				}
+				err = nil
+			}
+			return nil, err
+		}
+		b.Append(zv.Bytes, zv.IsContainer())
+		types[k] = zv.Type
+	}
+	typ, err := c.lookupTypeRecord(types)
+	if err != nil {
+		return nil, err
+	}
+	zv, err := b.Encode()
+	if err != nil {
+		return nil, err
+	}
+	rec := zng.NewRecord(typ, zv)
+	for _, d := range droppers {
+		r, err := d.Apply(rec)
 		if err != nil {
 			return nil, err
 		}
-		c.cutBuilders[in.Type.ID()] = cb
+		rec = r
 	}
-	if cb == nil {
-		return nil, nil
+	if rec != nil {
+		c.dirty = true
 	}
-	return cb.cut(in), nil
+	return rec, nil
+}
+
+func (c *Cutter) lookupTypeRecord(types []zng.Type) (*zng.TypeRecord, error) {
+	id := c.outTypes.Lookup(types)
+	typ, ok := c.recordTypes[id]
+	if !ok {
+		cols := c.builder.TypedColumns(types)
+		var err error
+		typ, err = c.zctx.LookupTypeRecord(cols)
+		if err != nil {
+			return nil, err
+		}
+		c.recordTypes[id] = typ
+	}
+	return typ, nil
+}
+
+func fieldList(fields []Evaluator) string {
+	var each []string
+	for _, fieldExpr := range fields {
+		s := "<not a field>"
+		if f, err := DotExprToField(fieldExpr); err == nil {
+			s = f.String()
+		}
+		each = append(each, s)
+	}
+	return strings.Join(each, ",")
+}
+
+func (c *Cutter) Warning() string {
+	if c.FoundCut() {
+		return ""
+	}
+	return fmt.Sprintf("nothing found for %s", fieldList(c.fieldExprs))
+}
+
+func (c *Cutter) Eval(rec *zng.Record) (zng.Value, error) {
+	out, err := c.Apply(rec)
+	if err != nil {
+		return zng.Value{}, err
+	}
+	if out == nil {
+		return zng.Value{}, ErrNoSuchField
+	}
+	return zng.Value{out.Type, out.Raw}, nil
 }

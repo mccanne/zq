@@ -5,7 +5,7 @@ script: |
   zar  import -R logs -sortmem 1MiB babble.tzng
   echo ===
   zar index -R logs -q v
-  zar find -R logs -z v=106 | zq -t "cut -c _log" -
+  zar find -R logs -z v=106 | zq -t "drop _log" -
   echo ===
 
 inputs:

@@ -4,7 +4,7 @@ script: |
   zar import -R logs babble-split2.tzng
   zar ls -R logs -ranges
   echo ===
-  zar stat -R logs -f zng | zq -t "cut -c log_id" -
+  zar stat -R logs -f zng | zq -t "drop log_id" -
   echo ===
   zar zq -R logs -t "*" > t1
   zq -t "sort -r ts" babble.tzng > t2

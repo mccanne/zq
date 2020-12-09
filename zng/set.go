@@ -94,6 +94,32 @@ func (t *TypeSet) Marshal(zv zcode.Bytes) (interface{}, error) {
 	return vals, nil
 }
 
+func (t *TypeSet) ZSON() string {
+	return fmt.Sprintf("|[%s]|", t.Type.ZSON())
+}
+
+func (t *TypeSet) ZSONOf(zv zcode.Bytes) string {
+	var b strings.Builder
+	b.WriteString("|[")
+	sep := ""
+	it := zv.Iter()
+	for !it.Done() {
+		val, _, err := it.Next()
+		if err != nil {
+			return badZng(err, t, zv)
+		}
+		b.WriteString(sep)
+		if val == nil {
+			b.WriteString("null")
+		} else {
+			b.WriteString(t.Type.ZSONOf(val))
+		}
+		sep = ","
+	}
+	b.WriteString("]|")
+	return b.String()
+}
+
 // NormalizeSet interprets zv as a set body and returns an equivalent set body
 // that is normalized according to the ZNG specification (i.e., each element's
 // tag-counted value is lexicographically greater than that of the preceding

@@ -117,7 +117,7 @@ func tsDirEntriesToChunks(ctx context.Context, ark *Archive, filterSpan nano.Spa
 			continue
 		}
 		dir := tsDir.path(ark)
-		md, err := chunk.ReadMetadata(ctx, chunk.MetadataPath(dir, id))
+		md, err := chunk.ReadMetadata(ctx, chunk.MetadataPath(dir, id), ark.DataOrder)
 		if err != nil {
 			if zqe.IsNotFound(err) {
 				continue

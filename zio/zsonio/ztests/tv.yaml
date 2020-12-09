@@ -1,0 +1,32 @@
+zql: "put t=typeof(s) | put tt=typeof(t)"
+
+output-flags: -f zson
+
+input: |
+  #foo=uint8
+  #0:record[s:string,n:int32,a:array[foo]]
+  0:[hello;123;[1;2;3;]]
+  0:[goodbye;34;[3;4;]]
+
+output: |
+  {
+      s: "hello",
+      n: 123 (int32),
+      a: [
+          1 (foo=(uint8)),
+          2 (foo),
+          3 (foo)
+      ] (=0),
+      t: (string),
+      tt: (type)
+  } (=1)
+  {
+      s: "goodbye",
+      n: 34,
+      a: [
+          3,
+          4
+      ],
+      t: (string),
+      tt: (type)
+  } (1)

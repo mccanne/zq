@@ -6,7 +6,7 @@ script: |
   # Verify the log_id's in the default table format.
   zq -t "count()" $(zar stat -R logs | grep -v ^TYPE | awk '{print "logs/"$2}' | sort | uniq)
   echo ===
-  zar stat -R logs -f zng | zq -t "cut -c log_id" -
+  zar stat -R logs -f zng | zq -t "drop log_id" -
 
 inputs:
   - name: babble.tzng

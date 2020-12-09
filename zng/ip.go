@@ -64,3 +64,15 @@ func (t *TypeOfIP) Marshal(zv zcode.Bytes) (interface{}, error) {
 	}
 	return ip.String(), nil
 }
+
+func (t *TypeOfIP) ZSON() string {
+	return "ip"
+}
+
+func (t *TypeOfIP) ZSONOf(zv zcode.Bytes) string {
+	ip, err := DecodeIP(zv)
+	if err != nil {
+		return badZng(err, t, zv)
+	}
+	return ip.String()
+}

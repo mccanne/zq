@@ -79,3 +79,7 @@ func (t *Table) LookupByValues(vals []zng.Value) int {
 func (t *Table) Types(id int) []zng.Type {
 	return t.types[id]
 }
+
+func (t *Table) Length() int {
+	return len(t.types)
+}

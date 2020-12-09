@@ -128,7 +128,7 @@ func (m *spanMultiSource) SourceFromRequest(ctx context.Context, req *api.Worker
 			return nil, zqe.E(zqe.Invalid, "invalid chunk path: %v", p)
 		}
 		uri := tsdir.path(m.ark)
-		md, err := chunk.ReadMetadata(ctx, chunk.MetadataPath(uri, id))
+		md, err := chunk.ReadMetadata(ctx, chunk.MetadataPath(uri, id), m.ark.DataOrder)
 		if err != nil {
 			return nil, err
 		}

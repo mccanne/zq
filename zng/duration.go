@@ -1,6 +1,8 @@
 package zng
 
 import (
+	"time"
+
 	"github.com/brimsec/zq/pkg/nano"
 	"github.com/brimsec/zq/zcode"
 )
@@ -53,4 +55,16 @@ func (t *TypeOfDuration) StringOf(zv zcode.Bytes, _ OutFmt, _ bool) string {
 
 func (t *TypeOfDuration) Marshal(zv zcode.Bytes) (interface{}, error) {
 	return t.StringOf(zv, OutFormatUnescaped, false), nil
+}
+
+func (t *TypeOfDuration) ZSON() string {
+	return "duration"
+}
+
+func (t *TypeOfDuration) ZSONOf(zv zcode.Bytes) string {
+	ns, err := DecodeDuration(zv)
+	if err != nil {
+		return badZng(err, t, zv)
+	}
+	return time.Duration(ns).String()
 }

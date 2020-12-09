@@ -2,6 +2,7 @@ package seekindex
 
 import (
 	"context"
+	"fmt"
 	"math"
 
 	"github.com/brimsec/zq/microindex"
@@ -14,6 +15,7 @@ import (
 
 type SeekIndex struct {
 	finder *microindex.Finder
+	uri    iosrc.URI
 }
 
 func Open(ctx context.Context, uri iosrc.URI) (*SeekIndex, error) {
@@ -21,7 +23,7 @@ func Open(ctx context.Context, uri iosrc.URI) (*SeekIndex, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &SeekIndex{finder: finder}, nil
+	return &SeekIndex{finder: finder, uri: uri}, nil
 }
 
 func (s *SeekIndex) Lookup(ctx context.Context, span nano.Span) (rg Range, err error) {
@@ -31,7 +33,7 @@ func (s *SeekIndex) Lookup(ctx context.Context, span nano.Span) (rg Range, err e
 		rg, err = s.lookupAsc(ctx, span)
 	}
 	if err != nil {
-		return
+		return rg, fmt.Errorf("seekindex %s: %w", s.uri, err)
 	}
 	if rg.Start == -1 {
 		rg.Start = 0

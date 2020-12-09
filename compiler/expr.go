@@ -236,15 +236,17 @@ func CompileAssignments(dsts []field.Static, srcs []field.Static) ([]field.Stati
 	return fields, resolvers
 }
 
-func compileCut(zctx *resolver.Context, node ast.FunctionCall) (expr.Evaluator, error) {
+func compileCutter(zctx *resolver.Context, node ast.FunctionCall) (*expr.Cutter, error) {
 	var lhs []field.Static
 	var rhs []expr.Evaluator
 	for _, expr := range node.Args {
 		// This is a bit of a hack and could be cleaed up by re-factoring
 		// CompileAssigment, but for now, we create an assigment expression
 		// where the LHS and RHS are the same, so that cut(id.orig_h,_path)
-		// gives a value of type record[id:record[orig_h:ip],_path:string]
+		// gives a value of type {id:{orig_h:ip},{_path:string}}
 		// with field names that are the same as the cut names.
+		// We should allow field assignments as function arguments.
+		// See issue #1772.
 		assignment := &ast.Assignment{LHS: expr, RHS: expr}
 		compiled, err := CompileAssignment(zctx, assignment)
 		if err != nil {
@@ -253,19 +255,27 @@ func compileCut(zctx *resolver.Context, node ast.FunctionCall) (expr.Evaluator, 
 		lhs = append(lhs, compiled.LHS)
 		rhs = append(rhs, compiled.RHS)
 	}
-	return expr.NewCutFunc(expr.NewCutter(zctx, false, lhs, rhs)), nil
+	return expr.NewCutter(zctx, lhs, rhs)
 }
 
 func compileCall(zctx *resolver.Context, node ast.FunctionCall) (expr.Evaluator, error) {
-	// For now, we special case cut here.  As we add more stateful functions
-	// this will make more sense.  We could also compile any reducer as a
-	// stateful function here, e.g., count(), would produce a new count() for
-	// each record encountered analogous to juttle stream functions.
+	// For now, we special case cut and pick here.  We shuold generalize this
+	// as we will add many more stateful functions and also resolve this
+	// the changes to create running aggegation functions from reducers.
+	// XXX See issue #1259.
 	if node.Function == "cut" {
-		return compileCut(zctx, node)
+		cut, err := compileCutter(zctx, node)
+		if err != nil {
+			return nil, err
+		}
+		cut.AllowPartialCuts()
+		return cut, nil
+	}
+	if node.Function == "pick" {
+		return compileCutter(zctx, node)
 	}
 	nargs := len(node.Args)
-	fn, err := function.New(node.Function, nargs)
+	fn, err := function.New(zctx, node.Function, nargs)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", node.Function, err)
 	}

@@ -112,3 +112,19 @@ func (t *TypeUnion) Marshal(zv zcode.Bytes) (interface{}, error) {
 	}
 	return Value{inner, zv}, nil
 }
+
+func (t *TypeUnion) ZSON() string {
+	var ss []string
+	for _, typ := range t.Types {
+		ss = append(ss, typ.ZSON())
+	}
+	return fmt.Sprintf("(%s)", strings.Join(ss, ","))
+}
+
+func (t *TypeUnion) ZSONOf(zv zcode.Bytes) string {
+	typ, _, iv, err := t.SplitZng(zv)
+	if err != nil {
+		return badZng(err, t, zv)
+	}
+	return fmt.Sprintf("%s (%s) %s", typ.ZSONOf(iv), typ.ZSON(), t.ZSON())
+}

@@ -44,7 +44,7 @@ func TestPcapPostSuccess(t *testing.T) {
 0:[1501770877.501001;]
 0:[1501770877.471635;]
 0:[1501770877.471635;]`
-		res := searchTzng(t, p.client, p.space.ID, "cut ts")
+		res := searchTzng(t, p.client, p.space.ID, "pick ts")
 		assert.Equal(t, test.Trim(expected), res)
 	})
 	t.Run("SpaceInfo", func(t *testing.T) {

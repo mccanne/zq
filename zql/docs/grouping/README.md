@@ -185,14 +185,21 @@ be observed by looking at the TZNG representation of the type definitions for
 each record type.
 
 ```zq-command
-zq -t 'count() by _path,typeof(.) | sort -r' http.log.gz dns.log.gz
+zq -f zson 'count() by _path,typeof(.) | sort _path' http.log.gz dns.log.gz
 ```
 
 #### Output:
 ```zq-output
-#0:record[_path:string,typeof:type,count:uint64]
-0:[http;record[_path:string,ts:time,uid:bstring,id:record[orig_h:ip,orig_p:port,resp_h:ip,resp_p:port],trans_depth:uint64,method:bstring,host:bstring,uri:bstring,referrer:bstring,version:bstring,user_agent:bstring,origin:bstring,request_body_len:uint64,response_body_len:uint64,status_code:uint64,status_msg:bstring,info_code:uint64,info_msg:bstring,tags:set[zenum],username:bstring,password:bstring,proxied:set[bstring],orig_fuids:array[bstring],orig_filenames:array[bstring],orig_mime_types:array[bstring],resp_fuids:array[bstring],resp_filenames:array[bstring],resp_mime_types:array[bstring]];144034;]
-0:[dns;record[_path:string,ts:time,uid:bstring,id:record[orig_h:ip,orig_p:port,resp_h:ip,resp_p:port],proto:zenum,trans_id:uint64,rtt:duration,query:bstring,qclass:uint64,qclass_name:bstring,qtype:uint64,qtype_name:bstring,rcode:uint64,rcode_name:bstring,AA:bool,TC:bool,RD:bool,RA:bool,Z:uint64,answers:array[bstring],TTLs:array[duration],rejected:bool];53615;]
+{
+    _path: "dns",
+    typeof: ({_path:string,ts:time,uid:bstring,id:{orig_h:ip,orig_p:port=(uint16),resp_h:ip,resp_p:port=(uint16)},proto:zenum=(string),trans_id:uint64,rtt:duration,query:bstring,qclass:uint64,qclass_name:bstring,qtype:uint64,qtype_name:bstring,rcode:uint64,rcode_name:bstring,AA:bool,TC:bool,RD:bool,RA:bool,Z:uint64,answers:[bstring],TTLs:[duration],rejected:bool}),
+    count: 53615 (uint64)
+} (=0)
+{
+    _path: "http",
+    typeof: ({_path:string,ts:time,uid:bstring,id:{orig_h:ip,orig_p:port=(uint16),resp_h:ip,resp_p:port=(uint16)},trans_depth:uint64,method:bstring,host:bstring,uri:bstring,referrer:bstring,version:bstring,user_agent:bstring,origin:bstring,request_body_len:uint64,response_body_len:uint64,status_code:uint64,status_msg:bstring,info_code:uint64,info_msg:bstring,tags:|[zenum=(string)]|,username:bstring,password:bstring,proxied:|[bstring]|,orig_fuids:[bstring],orig_filenames:[bstring],orig_mime_types:[bstring],resp_fuids:[bstring],resp_filenames:[bstring],resp_mime_types:[bstring]}),
+    count: 144034
+} (0)
 ```
 
 A way to achieve this would be to use the

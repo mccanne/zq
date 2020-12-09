@@ -5,7 +5,9 @@ input: |
   0:[]
   #1:record[a:record[]]
   1:[[]]
+  #2:record[a:record[],b:record[]]
+  2:[[][]]
 
 output: |
-  #0:record[a:record[]]
-  0:[[]]
+  #0:record[a:record[],b:record[]]
+  0:[[][]]

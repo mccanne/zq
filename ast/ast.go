@@ -15,13 +15,6 @@ import (
 	"github.com/brimsec/zq/field"
 )
 
-// XXX Get rid of Node.  Issue #1464.
-// A Node is shared by all the AST type nodes.  Currently, this contains the
-// op field, as every node type is defined by its op name.
-type Node struct {
-	Op string `json:"op"`
-}
-
 // Proc is the interface implemented by all AST processor nodes.
 type Proc interface {
 	ProcNode()
@@ -37,14 +30,14 @@ type BooleanExpr interface {
 // expression though it may have future uses (e.g., enum names or externally
 // referred to data e.g, maps to do external joins).
 type Identifier struct {
-	Node
+	Op   string `json:"op"`
 	Name string `json:"name"`
 }
 
 // RootRecord refers to the outer record being operated upon.  Field accesses
 // typically begin with the LHS of a "." expression set to a RootRecord.
 type RootRecord struct {
-	Node
+	Op string `json:"op"`
 }
 
 type Expression interface {
@@ -57,7 +50,7 @@ type Expression interface {
 // the native Go types) and value is a string representation of that value that
 // must conform to the provided type.
 type Literal struct {
-	Node
+	Op    string `json:"op"`
 	Type  string `json:"type"`
 	Value string `json:"value"`
 }
@@ -71,36 +64,36 @@ type Literal struct {
 type (
 	// A search is a "naked" search term
 	Search struct {
-		Node
+		Op    string  `json:"op"`
 		Text  string  `json:"text"`
 		Value Literal `json:"value"`
 	}
 
 	// A LogicalAnd node represents a logical and of two subexpressions.
 	LogicalAnd struct {
-		Node
+		Op    string      `json:"op"`
 		Left  BooleanExpr `json:"left"`
 		Right BooleanExpr `json:"right"`
 	}
 	// A LogicalOr node represents a logical or of two subexpressions.
 	LogicalOr struct {
-		Node
+		Op    string      `json:"op"`
 		Left  BooleanExpr `json:"left"`
 		Right BooleanExpr `json:"right"`
 	}
 	// A LogicalNot node represents a logical not of a subexpression.
 	LogicalNot struct {
-		Node
+		Op   string      `json:"op"`
 		Expr BooleanExpr `json:"expr"`
 	}
 	// A MatchAll node represents a filter that matches all records.
 	MatchAll struct {
-		Node
+		Op string `json:"op"`
 	}
 	// A CompareAny node represents a comparison operator with all of
 	// the fields in a record.
 	CompareAny struct {
-		Node
+		Op         string `json:"op"`
 		Comparator string `json:"comparator"`
 		Recursive  bool   `json:"recursive"`
 		Value      Literal
@@ -108,7 +101,7 @@ type (
 	// A CompareField node represents a comparison operator with a specific
 	// field in a record.
 	CompareField struct {
-		Node
+		Op         string     `json:"op"`
 		Comparator string     `json:"comparator"`
 		Field      Expression `json:"field"`
 		Value      Literal    `json:"value"`
@@ -128,7 +121,7 @@ func (*CompareField) booleanExprNode()     {}
 func (*BinaryExpression) booleanExprNode() {}
 
 type UnaryExpression struct {
-	Node
+	Op       string     `json:"op"`
 	Operator string     `json:"operator"`
 	Operand  Expression `json:"operand"`
 }
@@ -138,27 +131,27 @@ type UnaryExpression struct {
 // comparisons (=, !=, <, <=, >, >=), index operatons (on arrays, sets, and records)
 // with operator "[" and a dot expression (".") (on records).
 type BinaryExpression struct {
-	Node
+	Op       string     `json:"op"`
 	Operator string     `json:"operator"`
 	LHS      Expression `json:"lhs"`
 	RHS      Expression `json:"rhs"`
 }
 
 type ConditionalExpression struct {
-	Node
+	Op        string     `json:"op"`
 	Condition Expression `json:"condition"`
 	Then      Expression `json:"then"`
 	Else      Expression `json:"else"`
 }
 
 type FunctionCall struct {
-	Node
+	Op       string       `json:"op"`
 	Function string       `json:"function"`
 	Args     []Expression `json:"args"`
 }
 
 type CastExpression struct {
-	Node
+	Op   string     `json:"op"`
 	Expr Expression `json:"expr"`
 	Type string     `json:"type"`
 }
@@ -186,13 +179,13 @@ type (
 	// and each subsequent proc processes the output records from the
 	// previous proc.
 	SequentialProc struct {
-		Node
+		Op    string `json:"op"`
 		Procs []Proc `json:"procs"`
 	}
 	// A ParallelProc node represents a set of procs that each get
 	// a stream of records from their parent.
 	ParallelProc struct {
-		Node
+		Op string `json:"op"`
 		// If non-zero, MergeOrderField contains the field name on
 		// which the branches of this parallel proc should be
 		// merged in the order indicated by MergeOrderReverse.
@@ -202,7 +195,7 @@ type (
 	}
 	// A SortProc node represents a proc that sorts records.
 	SortProc struct {
-		Node
+		Op         string       `json:"op"`
 		Fields     []Expression `json:"fields"`
 		SortDir    int          `json:"sortdir"`
 		NullsFirst bool         `json:"nullsfirst"`
@@ -211,40 +204,52 @@ type (
 	// input record where each removed field matches one of the named fields
 	// sending each such modified record to its output in the order received.
 	CutProc struct {
-		Node
+		Op         string       `json:"op"`
 		Complement bool         `json:"complement"`
 		Fields     []Assignment `json:"fields"`
+	}
+	// A PickProc is like a CutProc but skips records that do not
+	// match all of the field expressions.
+	PickProc struct {
+		Op     string       `json:"op"`
+		Fields []Assignment `json:"fields"`
+	}
+	// A DropProc node represents a proc that removes fields from each
+	// input record.
+	DropProc struct {
+		Op     string       `json:"op"`
+		Fields []Expression `json:"fields"`
 	}
 	// A HeadProc node represents a proc that forwards the indicated number
 	// of records then terminates.
 	HeadProc struct {
-		Node
-		Count int `json:"count"`
+		Op    string `json:"op"`
+		Count int    `json:"count"`
 	}
 	// A TailProc node represents a proc that reads all its records from its
 	// input transmits the final number of records indicated by the count.
 	TailProc struct {
-		Node
-		Count int `json:"count"`
+		Op    string `json:"op"`
+		Count int    `json:"count"`
 	}
 	// A FilterProc node represents a proc that discards all records that do
 	// not match the indicfated filter and forwards all that match to its output.
 	FilterProc struct {
-		Node
+		Op     string      `json:"op"`
 		Filter BooleanExpr `json:"filter"`
 	}
 	// A PassProc node represents a passthrough proc that mirrors
 	// incoming Pull()s on its parent and returns the result.
 	PassProc struct {
-		Node
+		Op string `json:"op"`
 	}
 	// A UniqProc node represents a proc that discards any record that matches
 	// the previous record transmitted.  The Cflag causes the output records
 	// to contain a new field called count that contains the number of matched
 	// records in that set, similar to the unix shell command uniq.
 	UniqProc struct {
-		Node
-		Cflag bool `json:"cflag"`
+		Op    string `json:"op"`
+		Cflag bool   `json:"cflag"`
 	}
 	// A GroupByProc node represents a proc that consumes all the records
 	// in its input, partitions the records into groups based on the values
@@ -267,7 +272,7 @@ type (
 	// method. It is an error for either of these flags to be true
 	// if any reducer in Reducers is non-decomposable.
 	GroupByProc struct {
-		Node
+		Op           string       `json:"op"`
 		Duration     Duration     `json:"duration"`
 		InputSortDir int          `json:"input_sort_dir,omitempty"`
 		Limit        int          `json:"limit"`
@@ -282,31 +287,31 @@ type (
 	// the top N of the sort.
 	// - It has a hidden option (FlushEvery) to sort and emit on every batch.
 	TopProc struct {
-		Node
+		Op     string       `json:"op"`
 		Limit  int          `json:"limit"`
 		Fields []Expression `json:"fields"`
 		Flush  bool         `json:"flush"`
 	}
 
 	PutProc struct {
-		Node
+		Op      string       `json:"op"`
 		Clauses []Assignment `json:"clauses"`
 	}
 
 	// A RenameProc node represents a proc that renames fields.
 	RenameProc struct {
-		Node
+		Op     string       `json:"op"`
 		Fields []Assignment `json:"fields"`
 	}
 
 	// A FuseProc node represents a proc that turns a zng stream into a dataframe.
 	FuseProc struct {
-		Node
+		Op string `json:"op"`
 	}
 
 	// A JoinProc node represents a proc that joins two zng streams.
 	JoinProc struct {
-		Node
+		Op       string       `json:"op"`
 		LeftKey  Expression   `json:"left_key"`
 		RightKey Expression   `json:"right_key"`
 		Clauses  []Assignment `json:"clauses"`
@@ -314,7 +319,7 @@ type (
 )
 
 type Assignment struct {
-	Node
+	Op  string     `json:"op"`
 	LHS Expression `json:"lhs"`
 	RHS Expression `json:"rhs"`
 }
@@ -350,6 +355,8 @@ func (*SequentialProc) ProcNode() {}
 func (*ParallelProc) ProcNode()   {}
 func (*SortProc) ProcNode()       {}
 func (*CutProc) ProcNode()        {}
+func (*PickProc) ProcNode()       {}
+func (*DropProc) ProcNode()       {}
 func (*HeadProc) ProcNode()       {}
 func (*TailProc) ProcNode()       {}
 func (*PassProc) ProcNode()       {}
@@ -369,7 +376,7 @@ func (*JoinProc) ProcNode()       {}
 // a function of the record, e.g., count() counts up records without looking
 // into them.
 type Reducer struct {
-	Node
+	Op       string     `json:"op"`
 	Operator string     `json:"operator"`
 	Expr     Expression `json:"expr"`
 	Where    Expression `json:"where"`
@@ -410,14 +417,14 @@ func DotExprToField(n Expression) (field.Static, bool) {
 }
 
 func NewDotExpr(f field.Static) Expression {
-	lhs := Expression(&RootRecord{Node: Node{Op: "RootRecord"}})
+	lhs := Expression(&RootRecord{Op: "RootRecord"})
 	for _, name := range f {
 		rhs := &Identifier{
-			Node: Node{"Identifier"},
+			Op:   "Identifier",
 			Name: name,
 		}
 		lhs = &BinaryExpression{
-			Node:     Node{"BinaryExpr"},
+			Op:       "BinaryExpr",
 			Operator: ".",
 			LHS:      lhs,
 			RHS:      rhs,
@@ -427,7 +434,7 @@ func NewDotExpr(f field.Static) Expression {
 }
 
 func NewReducerAssignment(op string, lval field.Static, arg field.Static) Assignment {
-	reducer := &Reducer{Node: Node{"Reducer"}, Operator: op}
+	reducer := &Reducer{Op: "Reducer", Operator: op}
 	if arg != nil {
 		reducer.Expr = NewDotExpr(arg)
 	}
@@ -454,7 +461,7 @@ func FanIn(p Proc) int {
 
 func FilterToProc(be BooleanExpr) *FilterProc {
 	return &FilterProc{
-		Node:   Node{Op: "FilterProc"},
+		Op:     "FilterProc",
 		Filter: be,
 	}
 }

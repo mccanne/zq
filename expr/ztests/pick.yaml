@@ -1,0 +1,20 @@
+zql: pick s,x
+
+input: |
+  #0:record[x:int32,s:string]
+  0:[1;a;]
+  0:[2;b;]
+  #1:record[s:string]
+  1:[x;]
+  1:[b;]
+  #2:record[none:string]
+  2:[bad;]
+  0:[1;a;]
+  0:[3;e;]
+
+output: |
+  #0:record[s:string,x:int32]
+  0:[a;1;]
+  0:[b;2;]
+  0:[a;1;]
+  0:[e;3;]

@@ -291,6 +291,8 @@ NamedProc
   = SortProc
   / TopProc
   / CutProc
+  / PickProc
+  / DropProc
   / HeadProc
   / TailProc
   / FilterProc
@@ -349,6 +351,16 @@ CutProc
 CutArgs
   = args:(_ "-c" { RETURN(MAP("name": "c", "value": NULL)) })* {
       return makeArgMap(args)
+    }
+
+PickProc
+  = "pick"i _ columns:FlexAssignments {
+      RETURN(MAP("op": "PickProc", "fields": columns))
+    }
+
+DropProc
+  = "drop"i _ columns:FieldExprs {
+      RETURN(MAP("op": "DropProc", "fields": columns))
     }
 
 HeadProc

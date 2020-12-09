@@ -103,6 +103,10 @@ func arrayKey(inner zng.Type) string {
 	return fmt.Sprintf("a%d", inner.ID())
 }
 
+func typeTypeKey(typ zng.Type) string {
+	return fmt.Sprintf("t%d", typ.ID())
+}
+
 func aliasKey(name string) string {
 	return fmt.Sprintf("x%s", name)
 }

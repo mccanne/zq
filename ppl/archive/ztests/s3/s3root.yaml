@@ -5,7 +5,7 @@ script: |
   zar index -R s3://bucket/zartest -q v
   echo ===
   zar zq -R s3://bucket/zartest -t "count()"
-  zar find -R s3://bucket/zartest -z v=2 | zq -t "cut -c _log" -
+  zar find -R s3://bucket/zartest -z v=2 | zq -t "drop _log" -
   echo ===
   zar ls -R s3://bucket/zartest -relative | sort > t1
   (cd ./data/bucket/zartest; find zd -type d -regex ".*\.zar$") | sort > t2

@@ -73,3 +73,17 @@ func (t *TypeOfBstring) StringOf(data zcode.Bytes, fmt OutFmt, inContainer bool)
 	}
 	return string(append(out, data[start:len(data)]...))
 }
+
+func (t *TypeOfBstring) ZSON() string {
+	return "bstring"
+}
+
+// Values of type bstring may contain a mix of valid UTF-8 and arbitrary
+// binary data.  These are represented in output using the same formatting
+// with "\x.." escapes as Zeek.
+// In general, valid UTF-8 code points are passed through unmodified,
+// though for the ZEEK_ASCII output format, all non-ascii bytes are
+// escaped for compatibility with older versions of Zeek.
+func (t *TypeOfBstring) ZSONOf(data zcode.Bytes) string {
+	return QuotedString(data, true)
+}
