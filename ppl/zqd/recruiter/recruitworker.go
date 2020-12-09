@@ -30,11 +30,11 @@ func RecruitWorkers(ctx *proc.Context, workerCount int) ([]string, error) {
 	}
 
 	var raddr string
-	if raddr = os.Getenv("ZQD_RECRUIT"); raddr == "" {
-		return nil, fmt.Errorf("distributed exec failure: ZQD_RECRUIT not present")
+	if raddr = os.Getenv("ZQD_RECRUITER_ADDR"); raddr == "" {
+		return nil, fmt.Errorf("distributed exec failure: ZQD_RECRUITER_ADDR not present")
 	}
 	if _, _, err := net.SplitHostPort(raddr); err != nil {
-		return nil, fmt.Errorf("distributed exec failure: ZQD_RECRUIT for root process does not have host:port")
+		return nil, fmt.Errorf("distributed exec failure: ZQD_RECRUITER_ADDR for root process does not have host:port")
 	}
 	conn := client.NewConnectionTo("http://" + raddr)
 	recreq := api.RecruitRequest{NumberRequested: workerCount}

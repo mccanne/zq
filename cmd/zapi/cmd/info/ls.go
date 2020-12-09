@@ -52,9 +52,9 @@ func (c *LsCommand) Run(args []string) error {
 	}
 	if c.lflag {
 		// print details about each space
-		return printInfoList(matches)
+		return printSpaceSummaries(matches)
 	}
-	names := api.SpaceInfos(matches).Names()
+	names := cmd.SpaceNames(matches)
 	width := termwidth.Width()
 	// print listing laid out in columns like ls
 	err = colw.Write(os.Stdout, names, width, 3)
@@ -62,4 +62,13 @@ func (c *LsCommand) Run(args []string) error {
 		fmt.Println(strings.Join(names, "\n"))
 	}
 	return err
+}
+
+func printSpaceSummaries(sl []api.Space) error {
+	for _, space := range sl {
+		if err := printSpace(space.Name, space); err != nil {
+			return err
+		}
+	}
+	return nil
 }

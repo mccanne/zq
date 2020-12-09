@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"text/tabwriter"
@@ -41,46 +42,49 @@ func New(parent charm.Command, flags *flag.FlagSet) (charm.Command, error) {
 // is provided (in glob style) lists the info about that space.
 func (c *Command) Run(args []string) error {
 	conn := c.Connection()
+	var ids []api.SpaceID
 	if len(args) > 0 {
 		matches, err := cmd.SpaceGlob(c.Context(), conn, args...)
 		if err != nil {
 			return err
 		}
-		return printInfoList(matches)
+		for _, m := range matches {
+			ids = append(ids, m.ID)
+		}
+	} else {
+		id, err := c.SpaceID()
+		if err == cmd.ErrSpaceNotSpecified {
+			return errors.New("no space provided")
+		}
+		if err != nil {
+			return err
+		}
+		ids = []api.SpaceID{id}
 	}
-	id, err := c.SpaceID()
-	if err == cmd.ErrSpaceNotSpecified {
-		return errors.New("no space provided")
-	}
-	if err != nil {
-		return err
-	}
-	info, err := conn.SpaceInfo(c.Context(), id)
-	if err != nil {
-		return err
-	}
-	return printInfo(*info)
-}
-
-func printInfoList(spaces []api.SpaceInfo) error {
-	for _, space := range spaces {
-		if err := printInfo(space); err != nil {
+	for _, id := range ids {
+		info, err := conn.SpaceInfo(c.Context(), id)
+		if err != nil {
+			return err
+		}
+		if err := printSpace(info.Name, *info); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func printInfo(info api.SpaceInfo) error {
-	fmt.Println(info.Name)
-	w := tabwriter.NewWriter(os.Stdout, 0, 2, 1, ' ', 0)
-	infoVal := reflect.ValueOf(info)
+func printIface(w io.Writer, iface interface{}) {
+	infoVal := reflect.ValueOf(iface)
 	for i := 0; i < infoVal.NumField(); i++ {
 		v := infoVal.Field(i)
 		t := infoVal.Type().Field(i)
 		name := cmd.JSONName(t)
 		if v.Kind() == reflect.Ptr && v.IsNil() {
 			fmt.Fprintf(w, "  %s:\t%v\n", name, nil)
+			continue
+		}
+		if v.Kind() == reflect.Struct && t.Anonymous {
+			printIface(w, v.Interface())
 			continue
 		}
 		v = reflect.Indirect(v)
@@ -95,5 +99,11 @@ func printInfo(info api.SpaceInfo) error {
 		}
 		fmt.Fprintf(w, "  %s:\t%v\n", name, vi)
 	}
+}
+
+func printSpace(name string, iface interface{}) error {
+	fmt.Println(name)
+	w := tabwriter.NewWriter(os.Stdout, 0, 2, 1, ' ', 0)
+	printIface(w, iface)
 	return w.Flush()
 }

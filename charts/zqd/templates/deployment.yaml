@@ -62,8 +62,7 @@ spec:
               path: /status
               port: http
           env:
-          {{- if eq .Values.personality "worker"}}
-          - name: ZQD_REGISTER_ADDR
+          - name: ZQD_RECRUITER_ADDR
             value: "{{ .Values.RecruiterAddr }}"
           - name: ZQD_POD_IP
             valueFrom:
@@ -73,10 +72,6 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName
-          {{- else if eq .Values.personality "root" }}
-          - name: ZQD_RECRUIT
-            value: "{{ .Values.RecruiterAddr }}"
-          {{- end }}
           {{- if .Values.useCredSecret }}
           # These environment variables are set from secrets
           # when there is no service account

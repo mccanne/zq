@@ -207,14 +207,14 @@ func TestSearchError(t *testing.T) {
 
 func TestSpaceList(t *testing.T) {
 	names := []string{"sp1", "sp2", "sp3", "sp4"}
-	var expected []api.SpaceInfo
+	var expected []api.Space
 
 	ctx := context.Background()
 	c, conn := newCore(t)
 	for _, n := range names {
 		sp, err := conn.SpacePost(ctx, api.SpacePostRequest{Name: n})
 		require.NoError(t, err)
-		expected = append(expected, api.SpaceInfo{
+		expected = append(expected, api.Space{
 			ID:          sp.ID,
 			Name:        n,
 			DataPath:    c.Root().AppendPath(string(sp.ID)),
@@ -242,10 +242,12 @@ func TestSpaceInfo(t *testing.T) {
 
 	span := nano.Span{Ts: 1e9, Dur: 1e9 + 1}
 	expected := &api.SpaceInfo{
-		ID:          sp.ID,
-		Name:        sp.Name,
-		DataPath:    sp.DataPath,
-		StorageKind: api.FileStore,
+		Space: api.Space{
+			ID:          sp.ID,
+			Name:        sp.Name,
+			DataPath:    sp.DataPath,
+			StorageKind: api.FileStore,
+		},
 		Span:        &span,
 		Size:        81,
 		PcapSupport: false,
@@ -263,10 +265,12 @@ func TestSpaceInfoNoData(t *testing.T) {
 	info, err := conn.SpaceInfo(ctx, sp.ID)
 	require.NoError(t, err)
 	expected := &api.SpaceInfo{
-		ID:          sp.ID,
-		Name:        sp.Name,
-		DataPath:    sp.DataPath,
-		StorageKind: api.FileStore,
+		Space: api.Space{
+			ID:          sp.ID,
+			Name:        sp.Name,
+			DataPath:    sp.DataPath,
+			StorageKind: api.FileStore,
+		},
 		Size:        0,
 		PcapSupport: false,
 	}
@@ -434,10 +438,12 @@ func TestPostZngLogs(t *testing.T) {
 	info, err := conn.SpaceInfo(context.Background(), sp.ID)
 	require.NoError(t, err)
 	assert.Equal(t, &api.SpaceInfo{
-		ID:          sp.ID,
-		Name:        sp.Name,
-		DataPath:    sp.DataPath,
-		StorageKind: api.FileStore,
+		Space: api.Space{
+			ID:          sp.ID,
+			Name:        sp.Name,
+			DataPath:    sp.DataPath,
+			StorageKind: api.FileStore,
+		},
 		Span:        &nano.Span{Ts: nano.Ts(time.Second), Dur: int64(time.Second) + 1},
 		Size:        79,
 		PcapSupport: false,
@@ -508,10 +514,12 @@ func TestPostNDJSONLogs(t *testing.T) {
 		info, err := conn.SpaceInfo(context.Background(), sp.ID)
 		require.NoError(t, err)
 		require.Equal(t, &api.SpaceInfo{
-			ID:          sp.ID,
-			Name:        sp.Name,
-			DataPath:    sp.DataPath,
-			StorageKind: api.FileStore,
+			Space: api.Space{
+				ID:          sp.ID,
+				Name:        sp.Name,
+				DataPath:    sp.DataPath,
+				StorageKind: api.FileStore,
+			},
 			Span:        &span,
 			Size:        79,
 			PcapSupport: false,
@@ -634,12 +642,14 @@ func TestCreateArchiveSpace(t *testing.T) {
 
 	span := nano.Span{Ts: 1587508830068523240, Dur: 9789993714061}
 	expsi := &api.SpaceInfo{
-		ID:          sp.ID,
-		Name:        sp.Name,
-		DataPath:    sp.DataPath,
-		StorageKind: api.ArchiveStore,
-		Span:        &span,
-		Size:        35118,
+		Space: api.Space{
+			ID:          sp.ID,
+			Name:        sp.Name,
+			DataPath:    sp.DataPath,
+			StorageKind: api.ArchiveStore,
+		},
+		Span: &span,
+		Size: 35118,
 	}
 	si, err := conn.SpaceInfo(context.Background(), sp.ID)
 	require.NoError(t, err)

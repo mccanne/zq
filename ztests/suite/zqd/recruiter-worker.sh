@@ -30,7 +30,7 @@ zqdpid=$!
 awaitfile $portdir/zqd
 
 # then start one zqd worker that will register with the recruiter
-ZQD_REGISTER_ADDR="127.0.0.1:$(cat $portdir/zqd)" ZQD_NODE_NAME=test1 ZQD_POD_IP=test1 ZQD_PORT=5000 \
+ZQD_RECRUITER_ADDR="127.0.0.1:$(cat $portdir/zqd)" ZQD_NODE_NAME=test1 ZQD_POD_IP=test1 ZQD_PORT=5000 \
   zqd listen  -personality=worker -l=localhost:0 -portfile="$portdir/zqd-w1" \
   -data="$zqdroot" -suricataupdater=true  -loglevel=warn &> zqd-w1.log &
 zqdw1pid=$!

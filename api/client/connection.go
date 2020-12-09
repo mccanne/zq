@@ -169,10 +169,10 @@ func (c *Connection) SpaceInfo(ctx context.Context, id api.SpaceID) (*api.SpaceI
 	return resp.Result().(*api.SpaceInfo), nil
 }
 
-func (c *Connection) SpacePost(ctx context.Context, req api.SpacePostRequest) (*api.SpaceInfo, error) {
+func (c *Connection) SpacePost(ctx context.Context, req api.SpacePostRequest) (*api.Space, error) {
 	resp, err := c.Request(ctx).
 		SetBody(req).
-		SetResult(&api.SpaceInfo{}).
+		SetResult(&api.Space{}).
 		Post("/space")
 	if err != nil {
 		if r, ok := err.(*ErrorResponse); ok && r.StatusCode() == http.StatusConflict {
@@ -180,13 +180,13 @@ func (c *Connection) SpacePost(ctx context.Context, req api.SpacePostRequest) (*
 		}
 		return nil, err
 	}
-	return resp.Result().(*api.SpaceInfo), nil
+	return resp.Result().(*api.Space), nil
 }
 
-func (c *Connection) SubspacePost(ctx context.Context, id api.SpaceID, req api.SubspacePostRequest) (*api.SpaceInfo, error) {
+func (c *Connection) SubspacePost(ctx context.Context, id api.SpaceID, req api.SubspacePostRequest) (*api.Space, error) {
 	resp, err := c.Request(ctx).
 		SetBody(req).
-		SetResult(&api.SpaceInfo{}).
+		SetResult(&api.Space{}).
 		Post(path.Join("/space", string(id), "subspace"))
 	if err != nil {
 		if r, ok := err.(*ErrorResponse); ok && r.StatusCode() == http.StatusConflict {
@@ -194,7 +194,7 @@ func (c *Connection) SubspacePost(ctx context.Context, id api.SpaceID, req api.S
 		}
 		return nil, err
 	}
-	return resp.Result().(*api.SpaceInfo), nil
+	return resp.Result().(*api.Space), nil
 }
 
 func (c *Connection) SpacePut(ctx context.Context, id api.SpaceID, req api.SpacePutRequest) error {
@@ -204,8 +204,8 @@ func (c *Connection) SpacePut(ctx context.Context, id api.SpaceID, req api.Space
 	return err
 }
 
-func (c *Connection) SpaceList(ctx context.Context) ([]api.SpaceInfo, error) {
-	var res []api.SpaceInfo
+func (c *Connection) SpaceList(ctx context.Context) ([]api.Space, error) {
+	var res []api.Space
 	_, err := c.Request(ctx).
 		SetResult(&res).
 		Get("/space")

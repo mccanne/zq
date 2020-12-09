@@ -17,7 +17,7 @@ func handleWorkerRootSearch(c *Core, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.NumberOfWorkers < 1 || req.NumberOfWorkers > 100 {
+	if req.MaxWorkers < 1 || req.MaxWorkers > 100 {
 		// Note: the upper limit of distributed workers for any given query
 		// will be determined based on future testing.
 		// Hard coded for now to 100 for intial testing and research.
@@ -47,7 +47,7 @@ func handleWorkerRootSearch(c *Core, w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", out.ContentType())
-	if err := srch.RunDistributed(r.Context(), store, out, req.NumberOfWorkers); err != nil {
+	if err := srch.RunDistributed(r.Context(), store, out, req.MaxWorkers); err != nil {
 		c.requestLogger(r).Warn("Error writing response", zap.Error(err))
 	}
 }

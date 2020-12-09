@@ -8,5 +8,5 @@ type WorkerChunkRequest struct {
 
 type WorkerRootRequest struct {
 	SearchRequest
-	NumberOfWorkers int `json:"number_of_workers"`
+	MaxWorkers int `json:"max_workers"`
 }

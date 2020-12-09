@@ -138,12 +138,12 @@ func (m *Manager) spawnAlphaMigrations(ctx context.Context) {
 	}
 }
 
-func (m *Manager) CreateSpace(ctx context.Context, req api.SpacePostRequest) (api.SpaceInfo, error) {
+func (m *Manager) CreateSpace(ctx context.Context, req api.SpacePostRequest) (api.Space, error) {
 	if req.Name == "" && req.DataPath == "" {
-		return api.SpaceInfo{}, zqe.E(zqe.Invalid, "must supply non-empty name or dataPath")
+		return api.Space{}, zqe.E(zqe.Invalid, "must supply non-empty name or dataPath")
 	}
 	if !space.ValidSpaceName(req.Name) {
-		return api.SpaceInfo{}, zqe.E(zqe.Invalid, "name may not contain '/' or non-printable characters")
+		return api.Space{}, zqe.E(zqe.Invalid, "name may not contain '/' or non-printable characters")
 	}
 	id := space.NewSpaceID()
 	var datapath iosrc.URI
@@ -153,11 +153,11 @@ func (m *Manager) CreateSpace(ctx context.Context, req api.SpacePostRequest) (ap
 		var err error
 		datapath, err = iosrc.ParseURI(req.DataPath)
 		if err != nil {
-			return api.SpaceInfo{}, err
+			return api.Space{}, err
 		}
 	}
 	if err := iosrc.MkdirAll(datapath, 0777); err != nil {
-		return api.SpaceInfo{}, err
+		return api.Space{}, err
 	}
 	// If name is not set then derive name from DataPath, removing and
 	// replacing invalid characters.
@@ -175,7 +175,7 @@ func (m *Manager) CreateSpace(ctx context.Context, req api.SpacePostRequest) (ap
 		storecfg.Kind = api.FileStore
 	}
 	if storecfg.Kind == api.FileStore && m.rootPath.Scheme != "file" {
-		return api.SpaceInfo{}, zqe.E(zqe.Invalid, "cannot create file storage space on non-file backed data path")
+		return api.Space{}, zqe.E(zqe.Invalid, "cannot create file storage space on non-file backed data path")
 	}
 
 	row := SpaceRow{
@@ -195,30 +195,27 @@ func (m *Manager) CreateSpace(ctx context.Context, req api.SpacePostRequest) (ap
 			row.Name = fmt.Sprintf("%s_%d", name, i)
 			continue
 		}
-		return api.SpaceInfo{}, err
+		return api.Space{}, err
 	}
 
-	si, err := m.rowToSpaceInfo(ctx, row)
-	if err != nil {
-		return api.SpaceInfo{}, err
-	}
+	si := rowToSpace(row)
 	m.created.Inc()
 	return si, nil
 }
 
-func (m *Manager) CreateSubspace(ctx context.Context, parentID api.SpaceID, req api.SubspacePostRequest) (api.SpaceInfo, error) {
+func (m *Manager) CreateSubspace(ctx context.Context, parentID api.SpaceID, req api.SubspacePostRequest) (api.Space, error) {
 	if req.Name == "" {
-		return api.SpaceInfo{}, zqe.E(zqe.Invalid, "cannot set name to an empty string")
+		return api.Space{}, zqe.E(zqe.Invalid, "cannot set name to an empty string")
 	}
 	if !space.ValidSpaceName(req.Name) {
-		return api.SpaceInfo{}, zqe.E(zqe.Invalid, "name may not contain '/' or non-printable characters")
+		return api.Space{}, zqe.E(zqe.Invalid, "name may not contain '/' or non-printable characters")
 	}
 	parent, err := m.db.GetSpace(ctx, parentID)
 	if err != nil {
-		return api.SpaceInfo{}, err
+		return api.Space{}, err
 	}
 	if parent.Storage.Kind != api.ArchiveStore {
-		return api.SpaceInfo{}, zqe.E(zqe.Invalid, "space does not support creating subspaces")
+		return api.Space{}, zqe.E(zqe.Invalid, "space does not support creating subspaces")
 	}
 	row := SpaceRow{
 		ID:       space.NewSpaceID(),
@@ -233,11 +230,10 @@ func (m *Manager) CreateSubspace(ctx context.Context, parentID api.SpaceID, req 
 		},
 	}
 	if err := m.db.CreateSubspace(ctx, row); err != nil {
-		return api.SpaceInfo{}, err
+		return api.Space{}, err
 	}
 	m.created.Inc()
-
-	return m.GetSpace(ctx, row.ID)
+	return rowToSpace(row), nil
 }
 
 func (m *Manager) GetStorage(ctx context.Context, id api.SpaceID) (storage.Storage, error) {
@@ -299,13 +295,18 @@ func (m *Manager) getPcapStorage(ctx context.Context, datauri iosrc.URI) (*pcaps
 	return p, err
 }
 
-func (m *Manager) rowToSpaceInfo(ctx context.Context, sr SpaceRow) (api.SpaceInfo, error) {
-	spaceInfo := api.SpaceInfo{
-		ID:       sr.ID,
-		Name:     sr.Name,
-		DataPath: sr.DataURI,
-		ParentID: sr.ParentID,
+func rowToSpace(row SpaceRow) api.Space {
+	return api.Space{
+		ID:          row.ID,
+		DataPath:    row.DataURI,
+		Name:        row.Name,
+		ParentID:    row.ParentID,
+		StorageKind: row.Storage.Kind,
 	}
+}
+
+func (m *Manager) rowToSpaceInfo(ctx context.Context, sr SpaceRow) (api.SpaceInfo, error) {
+	spaceInfo := api.SpaceInfo{Space: rowToSpace(sr)}
 
 	store, err := m.getStorage(ctx, sr.ID, sr.DataURI, sr.Storage)
 	if err != nil {
@@ -357,18 +358,14 @@ func (m *Manager) GetSpace(ctx context.Context, id api.SpaceID) (api.SpaceInfo, 
 	return m.rowToSpaceInfo(ctx, sr)
 }
 
-func (m *Manager) ListSpaces(ctx context.Context) ([]api.SpaceInfo, error) {
+func (m *Manager) ListSpaces(ctx context.Context) ([]api.Space, error) {
 	rows, err := m.db.ListSpaces(ctx)
 	if err != nil {
 		return nil, err
 	}
-	var res []api.SpaceInfo
+	res := make([]api.Space, 0, len(rows))
 	for _, row := range rows {
-		si, err := m.rowToSpaceInfo(ctx, row)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, si)
+		res = append(res, rowToSpace(row))
 	}
 	return res, nil
 }

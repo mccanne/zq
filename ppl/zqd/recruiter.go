@@ -1,7 +1,5 @@
 package zqd
 
-// system test with: make TEST=TestZq/ztests/suite/zqd/rec-curl
-
 import (
 	"context"
 	"encoding/json"

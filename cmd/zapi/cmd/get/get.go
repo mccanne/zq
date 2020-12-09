@@ -118,8 +118,8 @@ func (c *Command) Run(args []string) error {
 		if c.workers > 1 {
 			// If the -workers flag in included, a WorkerRootRequest will be sent
 			rootWorkerReq := &api.WorkerRootRequest{
-				SearchRequest:   *req,
-				NumberOfWorkers: c.workers,
+				SearchRequest: *req,
+				MaxWorkers:    c.workers,
 			}
 			r, err = conn.WorkerRootSearch(c.Context(), *rootWorkerReq, params)
 			if err != nil {

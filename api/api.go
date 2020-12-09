@@ -99,27 +99,21 @@ func (s *SpaceID) Set(str string) error {
 	return nil
 }
 
-type SpaceInfo struct {
+type Space struct {
 	ID          SpaceID     `json:"id"`
+	ParentID    SpaceID     `json:"parent_id,omitempty"`
 	Name        string      `json:"name"`
 	DataPath    iosrc.URI   `json:"data_path"`
 	StorageKind StorageKind `json:"storage_kind"`
-	Span        *nano.Span  `json:"span,omitempty"`
-	Size        int64       `json:"size" unit:"bytes"`
-	PcapSupport bool        `json:"pcap_support"`
-	PcapSize    int64       `json:"pcap_size" unit:"bytes"`
-	PcapPath    iosrc.URI   `json:"pcap_path"`
-	ParentID    SpaceID     `json:"parent_id,omitempty"`
 }
 
-type SpaceInfos []SpaceInfo
-
-func (s SpaceInfos) Names() []string {
-	names := make([]string, len(s))
-	for i, info := range s {
-		names[i] = info.Name
-	}
-	return names
+type SpaceInfo struct {
+	Space
+	Span        *nano.Span `json:"span,omitempty"`
+	Size        int64      `json:"size" unit:"bytes"`
+	PcapSupport bool       `json:"pcap_support"`
+	PcapSize    int64      `json:"pcap_size" unit:"bytes"`
+	PcapPath    iosrc.URI  `json:"pcap_path"`
 }
 
 type VersionResponse struct {
