@@ -1,6 +1,5 @@
 script: |
   source recruiter-worker.sh
-  echo ===
   curl --header "Content-Type: application/json" -request POST \
     --data '{"number_requested":1}' \
     http://$ZQD_HOST/recruiter/recruit 2> err
@@ -11,6 +10,5 @@ inputs:
 
 outputs:
   - name: stdout
-    data: |
-      ===
-      {"workers":[{"addr":"test1:5000","node_name":"test1"}]}
+    regexp: |
+      \{"workers":\[\{"addr":"test1:\d+","node_name":"test1"\}\]\}

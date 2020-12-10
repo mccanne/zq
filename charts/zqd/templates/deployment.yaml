@@ -45,9 +45,10 @@ spec:
           {{- if eq .Values.personality "recruiter" }}
           args: ["listen", "-personality=recruiter", "-l=:9867"] 
           {{- else if eq .Values.personality "worker" }}
-          args: ["listen", "-personality=worker", "-l=:9867"] 
+          args: ["listen", "-personality=worker", "-l=:9867", "-recruiter={{ .Values.RecruiterAddr }}",
+            "-podip=$(SPEC_POD_IP)", "-nodename=$(SPEC_NODE_NAME)",] 
           {{- else }}
-          args: ["listen", "-l=:9867", "-data={{ .Values.datauri }}"] 
+          args: ["listen", "-l=:9867", "-data={{ .Values.datauri }}", "-recruiter={{ .Values.RecruiterAddr }}"] 
           {{- end }}
           ports:
             - name: http
@@ -62,13 +63,11 @@ spec:
               path: /status
               port: http
           env:
-          - name: ZQD_RECRUITER_ADDR
-            value: "{{ .Values.RecruiterAddr }}"
-          - name: ZQD_POD_IP
+          - name: SPEC_POD_IP
             valueFrom:
               fieldRef:
                 fieldPath: status.podIP
-          - name: ZQD_NODE_NAME
+          - name: SPEC_NODE_NAME
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName

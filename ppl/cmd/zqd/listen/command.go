@@ -37,7 +37,7 @@ var Listen = &charm.Spec{
 	Long: `
 The listen command launches a process to listen on the provided interface and
 `,
-	HiddenFlags: "brimfd,workers",
+	HiddenFlags: "brimfd,workers,recruiter,podip,nodename",
 	New:         New,
 }
 
@@ -61,7 +61,6 @@ type Command struct {
 	devMode             bool
 	listenAddr          string
 	logLevel            zapcore.Level
-	personality         string
 	portFile            string
 	pprof               bool
 	suricataRunnerPath  string
@@ -81,8 +80,12 @@ func New(parent charm.Command, f *flag.FlagSet) (charm.Command, error) {
 	f.StringVar(&c.conf.Personality, "personality", "all", "server personality (all, apiserver, recruiter, or worker)")
 	f.StringVar(&c.portFile, "portfile", "", "write listen port to file")
 	f.BoolVar(&c.pprof, "pprof", false, "add pprof routes to API")
+	f.StringVar(&c.conf.Recruiter, "recruiter", "", "Recruiter address for worker registration")
+	f.StringVar(&c.conf.SpecPodIP, "podip", "", "IP provided by Kubernetes SPEC_POD_IP")
+	f.StringVar(&c.conf.SpecNodeName, "nodename", "", "Node name provided by Kubernetes SPEC_NODE_NAME")
 	f.StringVar(&c.suricataRunnerPath, "suricatarunner", "", "command to generate Suricata eve.json from pcap data")
 	f.StringVar(&c.suricataUpdaterPath, "suricataupdater", "", "command to update Suricata rules (run once at startup)")
+	f.StringVar(&c.conf.Workers, "workers", "", "workers as comma-separated [addr]:port list")
 	f.StringVar(&c.zeekRunnerPath, "zeekrunner", "", "command to generate Zeek logs from pcap data")
 	return c, nil
 }
@@ -141,7 +144,13 @@ func (c *Command) Run(args []string) error {
 	// Workers should registerWithRecruiter as late as possible,
 	// just before writing Port file for tests.
 	if c.conf.Personality == "worker" {
-		if err := core.WorkerRegistration(ctx, srv.Addr()); err != nil {
+		if _, _, err := net.SplitHostPort(c.conf.Recruiter); err != nil {
+			return errors.New("flag -recruiter=host:port must be provided for -personality=worker")
+		}
+		if c.conf.SpecNodeName == "" {
+			return errors.New("flag -nodename must be provided for -personality=worker")
+		}
+		if err := core.WorkerRegistration(ctx, srv.Addr(), c.conf); err != nil {
 			return err
 		}
 	}

@@ -49,9 +49,9 @@ if [[ "$2" == workers ]]; then
   awaitfile $portdir/zqd-w2
   portw2=$(cat $portdir/zqd-w2)
 
-  ZQD_TEST_WORKERS=127.0.0.1:$portw1,127.0.0.1:$portw2 \
-    zqd listen -l=localhost:0 -portfile=$portdir/zqd -data=$zqdroot \
-    -loglevel=warn -suricataupdater=true &> zqd-root.log &
+  test_workers=127.0.0.1:$portw1,127.0.0.1:$portw2
+  zqd listen -l=localhost:0 -portfile=$portdir/zqd -data=$zqdroot \
+    -loglevel=warn -suricataupdater=true -workers=$test_workers &> zqd-root.log &
   zqdpid=$!
   awaitfile $portdir/zqd
 else

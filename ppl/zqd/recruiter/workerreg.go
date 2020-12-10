@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
 
 	"github.com/brimsec/zq/api"
 	"github.com/brimsec/zq/api/client"
@@ -18,28 +17,17 @@ type WorkerReg struct {
 	nodename      string
 }
 
-func NewWorkerReg(ctx context.Context, srvAddr string) (*WorkerReg, error) {
-	w := &WorkerReg{}
-	w.recruiteraddr = os.Getenv("ZQD_RECRUITER_ADDR")
-	if _, _, err := net.SplitHostPort(w.recruiteraddr); err != nil {
-		return nil, fmt.Errorf("worker ZQD_RECRUITER_ADDR does not have host:port %v", err)
-	}
-	w.conn = client.NewConnectionTo("http://" + w.recruiteraddr)
-	// For server host and port, the environment variables will override the discovered address.
-	// This allows the deployment to specify a dns address provided by the K8s API rather than an IP.
+func NewWorkerReg(ctx context.Context, srvAddr string, recruiteraddr string, specPodIP string, specNodeName string) (*WorkerReg, error) {
 	host, port, _ := net.SplitHostPort(srvAddr)
-	if h := os.Getenv("ZQD_POD_IP"); h != "" {
-		host = h
+	if specPodIP != "" {
+		host = specPodIP
 	}
-	if p := os.Getenv("ZQD_PORT"); p != "" {
-		port = p
-	}
-	w.selfaddr = net.JoinHostPort(host, port)
-	w.nodename = os.Getenv("ZQD_NODE_NAME")
-	if w.nodename == "" {
-		return nil, fmt.Errorf("env var ZQD_NODE_NAME required to register with recruiter")
-	}
-	return w, nil
+	return &WorkerReg{
+		conn:          client.NewConnectionTo("http://" + recruiteraddr),
+		nodename:      specNodeName,
+		recruiteraddr: recruiteraddr,
+		selfaddr:      net.JoinHostPort(host, port),
+	}, nil
 }
 
 func (w *WorkerReg) RegisterWithRecruiter(ctx context.Context, logger *zap.Logger) error {

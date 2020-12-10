@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 
 	"github.com/brimsec/zq/api"
@@ -13,9 +12,9 @@ import (
 	"go.uber.org/zap"
 )
 
-func RecruitWorkers(ctx *proc.Context, workerCount int) ([]string, error) {
-	if workerstr := os.Getenv("ZQD_TEST_WORKERS"); workerstr != "" {
-		// Special case: ZQD_TEST_WORKERS is used for ZTests
+func RecruitWorkers(ctx *proc.Context, workerCount int, recruiter string, workerstr string) ([]string, error) {
+	if workerstr != "" {
+		// Special case: workerstr is used for ZTests
 		workers := strings.Split(workerstr, ",")
 		if workerCount > len(workers) {
 			return nil, fmt.Errorf("requested parallelism %d is greater than the number of workers %d",
@@ -29,18 +28,17 @@ func RecruitWorkers(ctx *proc.Context, workerCount int) ([]string, error) {
 		return workers, nil
 	}
 
-	var raddr string
-	if raddr = os.Getenv("ZQD_RECRUITER_ADDR"); raddr == "" {
-		return nil, fmt.Errorf("distributed exec failure: ZQD_RECRUITER_ADDR not present")
+	if recruiter == "" {
+		return nil, fmt.Errorf("distributed exec failure: -recruiter flag is not present")
 	}
-	if _, _, err := net.SplitHostPort(raddr); err != nil {
-		return nil, fmt.Errorf("distributed exec failure: ZQD_RECRUITER_ADDR for root process does not have host:port")
+	if _, _, err := net.SplitHostPort(recruiter); err != nil {
+		return nil, fmt.Errorf("distributed exec failure: -recruiter flag does not have host:port")
 	}
-	conn := client.NewConnectionTo("http://" + raddr)
+	conn := client.NewConnectionTo("http://" + recruiter)
 	recreq := api.RecruitRequest{NumberRequested: workerCount}
 	resp, err := conn.Recruit(ctx, recreq)
 	if err != nil {
-		return nil, fmt.Errorf("distributed exec failure: error on recruit for recruiter at %s : %v", raddr, err)
+		return nil, fmt.Errorf("distributed exec failure: error on recruit for recruiter at %s : %v", recruiter, err)
 	}
 	if workerCount > len(resp.Workers) {
 		// TODO: we should fail back to running the query with fewer workers if possible.

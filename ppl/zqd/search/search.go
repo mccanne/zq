@@ -103,7 +103,7 @@ func (s *SearchOp) Run(ctx context.Context, store storage.Storage, output Output
 	}
 }
 
-func (s *SearchOp) RunDistributed(ctx context.Context, store storage.Storage, output Output, numberOfWorkers int) (err error) {
+func (s *SearchOp) RunDistributed(ctx context.Context, store storage.Storage, output Output, numberOfWorkers int, recruiter string, workers string) (err error) {
 	d := &searchdriver{
 		output:    output,
 		startTime: nano.Now(),
@@ -124,11 +124,13 @@ func (s *SearchOp) RunDistributed(ctx context.Context, store storage.Storage, ou
 	switch st := store.(type) {
 	case *archivestore.Storage:
 		return driver.MultiRun(ctx, d, s.query.Proc, zctx, st.MultiSource(), driver.MultiConfig{
-			Span:        s.query.Span,
-			StatsTick:   statsTicker.C,
+			Distributed: true,
 			Order:       zbuf.OrderDesc,
 			Parallelism: numberOfWorkers,
-			Distributed: true,
+			Recruiter:   recruiter,
+			Span:        s.query.Span,
+			StatsTick:   statsTicker.C,
+			Workers:     workers,
 		})
 	default:
 		return fmt.Errorf("storage type %T unsupported for distributed query", st)
