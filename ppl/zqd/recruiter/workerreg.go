@@ -43,16 +43,12 @@ func NewWorkerReg(ctx context.Context, srvAddr string) (*WorkerReg, error) {
 }
 
 func (w *WorkerReg) RegisterWithRecruiter(ctx context.Context, logger *zap.Logger) error {
-	unreservereq := api.UnreserveRequest{
-		Addrs: []string{w.selfaddr},
-	}
-	resp1, err := w.conn.Unreserve(ctx, unreservereq)
-	if err != nil {
-		return fmt.Errorf("error on unreserve with recruiter at %s : %v", w.recruiteraddr, err)
-	}
-	if resp1.Reserved != false {
-		return fmt.Errorf("recruiter did not acknowlege unreserve")
-	}
+	// This should be a loop that tries to reregister, called as a goroutine.
+	// Loop should be suspended when a /worker/search is in progress, and
+	// resume afterwards.
+	// So, break out of loop when reserved, then register is called again on /worker/release
+	// Failure case is when /worker/release is not called. Maybe we need some locks and timers
+	// to take care of that.
 
 	registerreq := api.RegisterRequest{
 		Worker: api.Worker{
@@ -60,15 +56,17 @@ func (w *WorkerReg) RegisterWithRecruiter(ctx context.Context, logger *zap.Logge
 			NodeName: w.nodename,
 		},
 	}
-	resp2, err := w.conn.Register(ctx, registerreq)
+	// this will be a long poll:
+	resp, err := w.conn.Register(ctx, registerreq)
 	if err != nil {
 		return fmt.Errorf("error on register with recruiter at %s : %v", w.recruiteraddr, err)
 	}
-	if resp2.Registered != true {
-		return fmt.Errorf("recruiter did not acknowlege register")
-	}
+
+	// various logic based on directive here
+
 	logger.Info(
-		"Registered",
+		"Registered response",
+		zap.Int("directive", int(resp.Directive)),
 		zap.String("selfaddr", w.selfaddr),
 		zap.String("recruiteraddr", w.recruiteraddr),
 		zap.String("nodename", w.nodename),

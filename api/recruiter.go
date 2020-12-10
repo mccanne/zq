@@ -35,7 +35,8 @@ type RegisterResponse struct {
 }
 
 type RecruitRequest struct {
-	NumberRequested int `json:"number_requested"`
+	Label           string `json:"label"`
+	NumberRequested int    `json:"number_requested"`
 }
 
 type RecruitResponse struct {

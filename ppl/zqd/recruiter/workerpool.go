@@ -22,8 +22,8 @@ type WorkerPool struct {
 }
 
 type RecruitmentDetail struct {
-	RootAddr  string
-	PeerCount int
+	Label           string // for tracing
+	NumberRequested int
 }
 
 type WorkerDetail struct {
@@ -42,28 +42,26 @@ func NewWorkerPool() *WorkerPool {
 }
 
 // Register adds workers to both the freePool and to the nodePool.
-// Returns true when the worker has been added to the freePool.
-// Returns false when the worker was reserved and was not added to the freePool.
 // In the nodePool, workers are added to the end of the slice,
 // and when they are recruited workers are removed from the start of the slice.
 // So the []WorkerDetail slice for each node functions as a FIFO queue.
-func (pool *WorkerPool) Register(addr string, nodename string, recruited chan RecruitmentDetail) (bool, error) {
+func (pool *WorkerPool) Register(addr string, nodename string, recruited chan RecruitmentDetail) error {
 	if _, _, err := net.SplitHostPort(addr); err != nil {
-		return false, fmt.Errorf("invalid address for Register: %w", err)
+		return fmt.Errorf("invalid address for Register: %w", err)
 	}
 	if nodename == "" {
-		return false, fmt.Errorf("node name required for Register")
+		return fmt.Errorf("node name required for Register")
 	}
 	wd := &WorkerDetail{Addr: addr, NodeName: nodename, Recruited: recruited}
 
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
-	if _, ok := pool.reservedPool[addr]; ok {
-		return false, nil // if the worker is reserved, it will not be registered
-	}
+
+	delete(pool.reservedPool, addr) //automatically unreserve on register
+
 	pool.freePool[addr] = wd
 	pool.nodePool[nodename] = append(pool.nodePool[nodename], wd)
-	return true, nil
+	return nil
 }
 
 // removeFromNodePool is internal and the calling function must hold the lock.
@@ -98,16 +96,6 @@ func (pool *WorkerPool) Deregister(addr string) {
 	if wd, ok := pool.freePool[addr]; ok {
 		pool.removeFromNodePool(wd)
 		delete(pool.freePool, addr)
-	}
-}
-
-// Unreserve removes from the reserved pool, but does not reregister.
-// The worker process should initiate register.
-func (pool *WorkerPool) Unreserve(addrs []string) {
-	pool.mu.Lock()
-	defer pool.mu.Unlock()
-	for _, addr := range addrs {
-		delete(pool.reservedPool, addr)
 	}
 }
 
