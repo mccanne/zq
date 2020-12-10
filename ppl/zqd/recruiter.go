@@ -117,7 +117,7 @@ func handleRecruiterStats(c *Core, w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleListFree pretty prints the output because it is for manual trouble-shooting
+// handleListFree pretty prints the output because it is for manual trouble-shooting.
 func handleListFree(c *Core, w http.ResponseWriter, r *http.Request) {
 	ws := c.workerPool.ListFreePool()
 	workers := make([]api.Worker, len(ws))

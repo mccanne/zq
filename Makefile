@@ -126,29 +126,29 @@ kubectl-config:
 
 helm-install-recruiter:
 	helm install recruiter charts/zqd \
+	--set AWSRegion=us-east-2 \
+	--set image.repository=$(ZQD_ECR_HOST)/ \
+	--set image.tag=zqd:$(ECR_VERSION) \
 	--set personality=recruiter \
-	--set AWSRegion="us-east-2" \
-	--set image.repository="$(ZQD_ECR_HOST)/" \
-	--set image.tag="zqd:$(ECR_VERSION)" \
 	--set useCredSecret=false
 
 helm-install-root:
 	helm install root charts/zqd \
+	--set AWSRegion=us-east-2 \
+	--set datauri=$(ZQD_DATA_URI) \
+	--set image.repository=$(ZQD_ECR_HOST)/ \
+	--set image.tag=zqd:$(ECR_VERSION) \
 	--set personality=root \
 	--set RecruiterAddr=recruiter-zqd:9867 \
-	--set AWSRegion="us-east-2" \
-	--set image.repository="$(ZQD_ECR_HOST)/" \
-	--set image.tag="zqd:$(ECR_VERSION)" \
-	--set useCredSecret=false \
-	--set datauri=$(ZQD_DATA_URI)
+	--set useCredSecret=false
 
 helm-install-worker:
 	helm install worker charts/zqd \
+	--set AWSRegion=us-east-2 \
+	--set image.repository=$(ZQD_ECR_HOST)/ \
+	--set image.tag=zqd:$(ECR_VERSION) \
 	--set personality=worker \
 	--set RecruiterAddr=recruiter-zqd:9867 \
-	--set AWSRegion="us-east-2" \
-	--set image.repository="$(ZQD_ECR_HOST)/" \
-	--set image.tag="zqd:$(ECR_VERSION)" \
 	--set useCredSecret=false
 
 make helm-uninstall:

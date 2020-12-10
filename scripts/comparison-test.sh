@@ -106,7 +106,7 @@ do
 
     JQ=${JQ_FILTERS[$n]}
     JQFLAG=${JQFLAGS[$n]}
-    echo -n "|\`jq\`|\`$JQFLAG \"${JQ//|/\\|}\"\`|ndjson|ndjson|" | tee -a "$MD"
+    echo -n "|\`jq\`|\`$JQFLAG ""'""${JQ//|/\\|}""'""\`|ndjson|ndjson|" | tee -a "$MD"
     # shellcheck disable=SC2086      # For expanding JQFLAG
     ALL_TIMES=$(time -p ($ZCAT "$DATA"/zeek-ndjson/* | jq $JQFLAG "$JQ" > /dev/null) 2>&1)
     echo "$ALL_TIMES" | tr '\n' ' ' | awk '{ print $2 "|" $4 "|" $6 "|" }' | tee -a "$MD"

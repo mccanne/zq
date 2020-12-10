@@ -49,7 +49,7 @@ The results below reflect performance as of `zq` commit `1813bdf8`.
 |`zq`|`*`|ndjson|tzng|59.03|87.89|1.44|
 |`zq`|`*`|ndjson|ndjson|63.24|134.11|2.04|
 |`zeek-cut`||zeek|zeek-cut|1.20|1.24|0.15|
-|`jq`|`-c "."`|ndjson|ndjson|35.58|39.28|1.84|
+|`jq`|`-c '.'`|ndjson|ndjson|35.58|39.28|1.84|
 
 ### Extract the field `ts`
 
@@ -81,7 +81,7 @@ The results below reflect performance as of `zq` commit `1813bdf8`.
 |`zq`|`cut ts`|ndjson|tzng|60.05|80.63|1.41|
 |`zq`|`cut ts`|ndjson|ndjson|61.17|85.59|1.57|
 |`zeek-cut`|`ts`|zeek|zeek-cut|1.33|1.39|0.19|
-|`jq`|`-c ". \| { ts }"`|ndjson|ndjson|20.61|23.18|1.32|
+|`jq`|`-c '. \| { ts }'`|ndjson|ndjson|20.61|23.18|1.32|
 
 ### Count all events
 
@@ -112,7 +112,7 @@ The results below reflect performance as of `zq` commit `1813bdf8`.
 |`zq`|`count()`|ndjson|zng-uncompressed|63.57|83.07|1.27|
 |`zq`|`count()`|ndjson|tzng|62.28|81.10|1.43|
 |`zq`|`count()`|ndjson|ndjson|62.93|82.19|1.37|
-|`jq`|`-c -s ". \| length"`|ndjson|ndjson|23.10|24.06|3.17|
+|`jq`|`-c -s '. \| length'`|ndjson|ndjson|23.10|24.06|3.17|
 
 ### Count all events, grouped by the field `id.orig_h`
 
@@ -143,7 +143,7 @@ The results below reflect performance as of `zq` commit `1813bdf8`.
 |`zq`|`count() by id.orig_h`|ndjson|zng-uncompressed|67.57|89.70|1.65|
 |`zq`|`count() by id.orig_h`|ndjson|tzng|63.24|83.79|1.43|
 |`zq`|`count() by id.orig_h`|ndjson|ndjson|59.09|78.34|1.24|
-|`jq`|`-c -s "group_by(."id.orig_h")[] \| length as $l \| .[0] \| .count = $l \| {count,"id.orig_h"}"`|ndjson|ndjson|31.79|32.29|3.19|
+|`jq`|`-c -s 'group_by(."id.orig_h")[] \| length as $l \| .[0] \| .count = $l \| {count,"id.orig_h"}'`|ndjson|ndjson|31.79|32.29|3.19|
 
 ### Output all events with the field `id.resp_h` set to `52.85.83.116`
 
@@ -174,5 +174,5 @@ The results below reflect performance as of `zq` commit `1813bdf8`.
 |`zq`|`id.resp_h=52.85.83.116`|ndjson|zng-uncompressed|58.25|75.85|1.32|
 |`zq`|`id.resp_h=52.85.83.116`|ndjson|tzng|58.39|76.07|1.37|
 |`zq`|`id.resp_h=52.85.83.116`|ndjson|ndjson|58.31|76.00|1.30|
-|`jq`|`-c ". \| select(.["id.resp_h"]=="52.85.83.116")"`|ndjson|ndjson|17.69|20.30|1.11|
+|`jq`|`-c '. \| select(.["id.resp_h"]=="52.85.83.116")'`|ndjson|ndjson|17.69|20.30|1.11|
 

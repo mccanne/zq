@@ -1,0 +1,19 @@
+script: |
+  source services.sh
+  zapi -h $ZQD_HOST new -k archivestore s1
+  export SPACE_ID=$(zapi -h $ZQD_HOST ls -l s1 | grep "id:" | head -n 1 | awk  '{print $2}')
+  echo ===
+  zapi -h $ZQD_HOST newsubspace -p ${SPACE_ID} -n sub1 badlogid
+
+inputs:
+  - name: services.sh
+    source: ../services.sh
+
+outputs:
+  - name: stdout
+    data: |
+      s1: space created
+      ===
+  - name: stderr
+    regexp: |
+      .*badlogid not a chunk file name.*

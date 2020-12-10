@@ -178,7 +178,7 @@ func (pg *parallelGroup) doneSource(sc ScannerCloser) {
 	delete(pg.scanners, sc)
 }
 
-// sourceToRequest takes a Source and converts it into a WorkerChunkRequest
+// sourceToRequest takes a Source and converts it into a WorkerChunkRequest.
 func (pg *parallelGroup) sourceToRequest(src Source) (*api.WorkerChunkRequest, error) {
 	var req api.WorkerChunkRequest
 	if err := src.ToRequest(&req); err != nil {
@@ -224,19 +224,18 @@ func createParallelGroup(pctx *proc.Context, filter *compiler.Filter, msrc Multi
 	}
 
 	var sources []proc.Interface
-	if mcfg.DistributedExec {
+	if mcfg.Distributed {
 		workers, err := recruiter.RecruitWorkers(pctx, mcfg.Parallelism)
 		if err != nil {
 			return nil, nil, err
 		}
-		var connectionsToRelease []*client.Connection
+		var conns []*client.Connection
 		for _, w := range workers {
 			conn := client.NewConnectionTo("http://" + w)
-			connectionsToRelease = append(connectionsToRelease, conn)
-			sources = append(sources, &parallelHead{
-				pctx: pctx, pg: pg, workerConn: conn})
+			conns = append(conns, conn)
+			sources = append(sources, &parallelHead{pctx: pctx, pg: pg, workerConn: conn})
 		}
-		go pg.releaseWorkersOnDone(connectionsToRelease)
+		go pg.releaseWorkersOnDone(conns)
 	} else {
 		// This is the code path used by the zqd daemon for Brim.
 		for i := 0; i < mcfg.Parallelism; i++ {

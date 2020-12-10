@@ -149,9 +149,9 @@ func (c *Core) addRecruiterRoutes() {
 }
 
 func (c *Core) addWorkerRoutes() {
+	c.handle("/worker/chunksearch", handleWorkerChunkSearch).Methods("POST")
 	c.handle("/worker/release", handleWorkerRelease).Methods("GET")
 	c.handle("/worker/rootsearch", handleWorkerRootSearch).Methods("POST")
-	c.handle("/worker/chunksearch", handleWorkerChunkSearch).Methods("POST")
 }
 
 func (c *Core) handle(path string, f func(*Core, http.ResponseWriter, *http.Request)) *mux.Route {

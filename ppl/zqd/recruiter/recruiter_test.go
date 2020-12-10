@@ -25,13 +25,13 @@ func assertPoolLen(t *testing.T, wp *WorkerPool, fp int, np int, rp int) {
 
 func TestBadCalls(t *testing.T) {
 	wp := NewWorkerPool()
-	b, err := wp.Register("a.b;;5000", "n1")
+	registered, err := wp.Register("a.b;;5000", "n1")
 	assert.NotNil(t, err)
-	assert.False(t, b)
+	assert.False(t, registered)
 	assertPoolLen(t, wp, 0, 0, 0)
-	b, err = wp.Register("a.b:5000", "")
+	registered, err = wp.Register("a.b:5000", "")
 	assert.NotNil(t, err)
-	assert.False(t, b)
+	assert.False(t, registered)
 	assertPoolLen(t, wp, 0, 0, 0)
 }
 
@@ -79,9 +79,9 @@ func TestRegister10(t *testing.T) {
 		nodename = "n" + strconv.Itoa(i)
 		for j := 0; j < 2; j++ {
 			addr = nodename + ".x:" + strconv.Itoa(5000+j)
-			b, err := wp.Register(addr, nodename)
+			registered, err := wp.Register(addr, nodename)
 			require.NoError(t, err)
-			assert.True(t, b)
+			assert.True(t, registered)
 		}
 	}
 	assertPoolLen(t, wp, 10, 5, 0)
@@ -98,9 +98,9 @@ func initNodesWithWorkers(t *testing.T, wp *WorkerPool, width int, height int) {
 		nodename = "n" + strconv.Itoa(i)
 		for j := 0; j < height; j++ {
 			addr = nodename + ".x:" + strconv.Itoa(5000+j)
-			b, err := wp.Register(addr, nodename)
+			registered, err := wp.Register(addr, nodename)
 			require.NoError(t, err)
-			assert.True(t, b)
+			assert.True(t, registered)
 		}
 	}
 }
@@ -112,9 +112,9 @@ func initNodesOfVaryingSize(t *testing.T, wp *WorkerPool, size int) {
 		nodename = "n" + strconv.Itoa(i)
 		for j := 0; j < i+1; j++ {
 			addr = nodename + ".x:" + strconv.Itoa(5000+j)
-			b, err := wp.Register(addr, nodename)
+			registered, err := wp.Register(addr, nodename)
 			require.NoError(t, err)
-			assert.True(t, b)
+			assert.True(t, registered)
 		}
 	}
 }

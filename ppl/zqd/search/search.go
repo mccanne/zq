@@ -124,11 +124,11 @@ func (s *SearchOp) RunDistributed(ctx context.Context, store storage.Storage, ou
 	switch st := store.(type) {
 	case *archivestore.Storage:
 		return driver.MultiRun(ctx, d, s.query.Proc, zctx, st.MultiSource(), driver.MultiConfig{
-			Span:            s.query.Span,
-			StatsTick:       statsTicker.C,
-			Order:           zbuf.OrderDesc,
-			Parallelism:     numberOfWorkers,
-			DistributedExec: true,
+			Span:        s.query.Span,
+			StatsTick:   statsTicker.C,
+			Order:       zbuf.OrderDesc,
+			Parallelism: numberOfWorkers,
+			Distributed: true,
 		})
 	default:
 		return fmt.Errorf("storage type %T unsupported for distributed query", st)

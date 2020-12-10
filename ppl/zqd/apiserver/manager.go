@@ -217,17 +217,22 @@ func (m *Manager) CreateSubspace(ctx context.Context, parentID api.SpaceID, req 
 	if parent.Storage.Kind != api.ArchiveStore {
 		return api.Space{}, zqe.E(zqe.Invalid, "space does not support creating subspaces")
 	}
+	id := space.NewSpaceID()
+	cfg := api.StorageConfig{
+		Kind: api.ArchiveStore,
+		Archive: &api.ArchiveConfig{
+			OpenOptions: &req.OpenOptions,
+		},
+	}
+	if _, err := m.getStorage(ctx, id, parent.DataURI, cfg); err != nil {
+		return api.Space{}, zqe.ErrInvalid("invalid subspace storage config: %w", err)
+	}
 	row := SpaceRow{
-		ID:       space.NewSpaceID(),
+		ID:       id,
 		ParentID: parentID,
 		Name:     req.Name,
 		DataURI:  parent.DataURI,
-		Storage: api.StorageConfig{
-			Kind: api.ArchiveStore,
-			Archive: &api.ArchiveConfig{
-				OpenOptions: &req.OpenOptions,
-			},
-		},
+		Storage:  cfg,
 	}
 	if err := m.db.CreateSubspace(ctx, row); err != nil {
 		return api.Space{}, err

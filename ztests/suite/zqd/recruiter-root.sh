@@ -52,5 +52,3 @@ awaitfile $portdir/zqd-root
 export ZQD_HOST=localhost:$(cat $portdir/zqd-root)
 
 trap "rm -rf $portdir; kill -9 $zqdrpid $zqdw1pid $zqdw2pid $zqdrootpid" EXIT
-
-
