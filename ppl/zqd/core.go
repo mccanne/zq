@@ -3,8 +3,10 @@ package zqd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"sync/atomic"
 
@@ -32,17 +34,21 @@ const indexPage = `
 </html>`
 
 type Config struct {
-	Logger       *zap.Logger
-	Personality  string
-	Recruiter    string
-	Root         string
-	SpecPodIP    string
-	SpecNodeName string
-	Version      string
-	Workers      string
+	Logger      *zap.Logger
+	Personality string
+	Recruiter   string
+	Root        string
+	Version     string
+	Worker      WorkerConfig
+	Workers     string
 
 	Suricata pcapanalyzer.Launcher
 	Zeek     pcapanalyzer.Launcher
+}
+
+type WorkerConfig struct {
+	Host string
+	Node string
 }
 
 type Core struct {
@@ -112,6 +118,7 @@ func NewCore(ctx context.Context, conf Config) (*Core, error) {
 
 	switch conf.Personality {
 	case "", "all":
+		println("I am root with data=", conf.Root, c.root.String())
 		c.addAPIServerRoutes()
 		c.addWorkerRoutes()
 	case "apiserver":
@@ -199,8 +206,14 @@ func (c *Core) requestLogger(r *http.Request) *zap.Logger {
 }
 
 func (c *Core) WorkerRegistration(ctx context.Context, srvAddr string, conf Config) error {
+	if _, _, err := net.SplitHostPort(conf.Recruiter); err != nil {
+		return errors.New("flag -recruiter=host:port must be provided for -personality=worker")
+	}
+	if conf.Worker.Node == "" {
+		return errors.New("flag -workernode must be provided for -personality=worker")
+	}
 	var err error
-	c.workerReg, err = recruiter.NewWorkerReg(ctx, srvAddr, conf.Recruiter, conf.SpecPodIP, conf.SpecNodeName)
+	c.workerReg, err = recruiter.NewWorkerReg(ctx, srvAddr, conf.Recruiter, conf.Worker.Host, conf.Worker.Node)
 	if err != nil {
 		return err
 	}

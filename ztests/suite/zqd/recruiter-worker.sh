@@ -35,7 +35,7 @@ node_name=test1
 
 zqd listen  -personality=worker -l=localhost:0 -portfile="$portdir/zqd-w1" \
   -data="$zqdroot" -suricataupdater=true  -loglevel=warn \
-  -recruiter=$recruiter -nodename=$node_name -podip=$node_name &> zqd-w1.log &
+  -recruiter=$recruiter -workernode=$node_name -workerhost=$node_name &> zqd-w1.log &
 zqdw1pid=$!
 awaitfile $portdir/zqd-w1
 

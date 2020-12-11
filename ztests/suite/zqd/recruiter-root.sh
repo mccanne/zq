@@ -38,12 +38,12 @@ node_name=test1
 
 # (2) start two zqd workers that register with the recruiter
 zqd listen -personality=worker -l=localhost:0 -portfile=$portdir/zqd-w1 \
-  -recruiter=$recruiter -nodename=$node_name &> zqd-w1.log &
+  -recruiter=$recruiter -workernode=$node_name &> zqd-w1.log &
 zqdw1pid=$!
 awaitfile $portdir/zqd-w1
 
 zqd listen -personality=worker -l=localhost:0 -portfile=$portdir/zqd-w2 \
-  -recruiter=$recruiter -nodename=$node_name &> zqd-w2.log &
+  -recruiter=$recruiter -workernode=$node_name &> zqd-w2.log &
 zqdw1pid=$!
 awaitfile $portdir/zqd-w2
 
