@@ -55,13 +55,20 @@ bin/$(SURICATAPATH):
 	unzip -q bin/$(SURICATAPATH).zip -d bin \
 		&& mv bin/suricata bin/$(SURICATAPATH)
 
-bin/minio:
+.PHONY: bin/go.mod
+bin/go.mod:
+	@rm -rf bin
 	@mkdir -p bin
-	@echo 'module deps' > bin/go.mod
-	@echo 'require github.com/minio/minio latest' >> bin/go.mod
-	@echo 'replace github.com/minio/minio => github.com/brimsec/minio v0.0.0-20201019191454-3c6f24527f6d' >> bin/go.mod
-	@cd bin && GOBIN="$(CURDIR)/bin" go install github.com/minio/minio
+	@cd bin && go mod init deps
 
+bin/minio: bin/go.mod
+	@mkdir -p bin
+	cd bin && go get -d github.com/minio/minio@1341bf5a9e284c1764baf08c1ee7d2a6af0b4a02
+	cd bin && go mod edit -replace 'github.com/minio/minio=github.com/brimsec/minio@v0.0.0-20201019191454-3c6f24527f6d'
+	cd bin && go mod download github.com/minio/minio
+	cd bin && GOBIN="$(CURDIR)/bin" go install github.com/minio/minio
+
+			#
 generate:
 	@GOBIN="$(CURDIR)/bin" go install github.com/golang/mock/mockgen
 	@PATH="$(CURDIR)/bin:$(PATH)" go generate ./...
