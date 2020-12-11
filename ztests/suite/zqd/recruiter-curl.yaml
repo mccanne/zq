@@ -2,22 +2,17 @@ script: |
   source recruiter-curl.sh
   curl -X POST -d '{"addr":"a.b.c:5000","node_name":"a.b","timeout":1}' \
     http://$ZQD_HOST/recruiter/register 2> err
-  # curl http://$ZQD_HOST/recruiter/stats 2> err
-  # curl http://$ZQD_HOST/recruiter/listfree 2> err
-  # curl -X POST -d '{"number_requested":1}' http://$ZQD_HOST/recruiter/recruit 2> err
-  # curl -request GET http://$ZQD_HOST/recruiter/stats 2> err
-  # # For the second register, the worker will be in the reserved pool,
-  # # so it will not be reregistered.
-  # curl -X POST -d '{"addr":"a.b.c:5000","node_name":"a.b"}' \
-  #   http://$ZQD_HOST/recruiter/register 2> err
-  # curl -X POST -d '{"addrs":["a.b.c:5000"]}' \
-  #   http://$ZQD_HOST/recruiter/unreserve 2> err
-  # curl -X POST -d '{"addr":"a.b.c:5000","node_name":"a.b"}' \
-  #   http://$ZQD_HOST/recruiter/register 2> err
-  # curl -X POST -d '{"addr":"a.b.c:5000"}' \
-  #   http://$ZQD_HOST/recruiter/deregister 2> err
-  # curl -X POST -d '{"number_requested":1}' http://$ZQD_HOST/recruiter/recruit 2> err
-  cat zqd.log
+  curl -X POST -d '{"addr":"a.b.c:5000","node_name":"a.b","timeout":30000}' \
+    http://$ZQD_HOST/recruiter/register 2> err &   
+  # This is intentionally backgrounded. The 100ms sleep allows the registration.
+  sleep 0.1
+  curl http://$ZQD_HOST/recruiter/stats 2> err
+  curl http://$ZQD_HOST/recruiter/listfree 2> err
+  # This /recruit call will cause the backgrounded /register to return
+  # and print it's output.
+  curl -X POST -d '{"number_requested":1}' http://$ZQD_HOST/recruiter/recruit 2> err
+  curl -request GET http://$ZQD_HOST/recruiter/stats 2> err
+  curl http://$ZQD_HOST/recruiter/listfree 2> err
 
 inputs:
   - name: recruiter-curl.sh
@@ -26,7 +21,7 @@ inputs:
 outputs:
   - name: stdout
     data: |
-      {"registered":true}
+      {"directive":"reregister"}
       {"len_free_pool":1,"len_reserved_pool":0,"len_node_pool":1}
       {
         "workers": [
@@ -37,9 +32,8 @@ outputs:
         ]
       }
       {"workers":[{"addr":"a.b.c:5000","node_name":"a.b"}]}
+      {"directive":"reserved"}
       {"len_free_pool":0,"len_reserved_pool":1,"len_node_pool":0}
-      {"registered":false}
-      {"reserved":false}
-      {"registered":true}
-      {"registered":false}
-      {"workers":[]}
+      {
+        "workers": []
+      }

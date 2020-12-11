@@ -54,7 +54,7 @@ func (w *WorkerReg) RegisterWithRecruiter(ctx context.Context, logger *zap.Logge
 
 	logger.Info(
 		"Registered response",
-		zap.Int("directive", int(resp.Directive)),
+		zap.String("directive", resp.Directive),
 		zap.String("selfaddr", w.selfaddr),
 		zap.String("recruiteraddr", w.recruiteraddr),
 		zap.String("nodename", w.nodename),
