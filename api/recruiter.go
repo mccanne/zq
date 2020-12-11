@@ -18,20 +18,12 @@ type Worker struct {
 }
 
 type RegisterRequest struct {
-	RequestedTimeout int `json:"requested_timeout"`
+	Timeout int `json:"timeout"`
 	Worker
 }
 
-type WorkerDirective int
-
-const (
-	Reregister WorkerDirective = iota
-	Reserved
-	Shutdown
-)
-
 type RegisterResponse struct {
-	Directive WorkerDirective `json:"directive"`
+	Directive string `json:"directive"`
 }
 
 type RecruitRequest struct {

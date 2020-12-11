@@ -36,8 +36,8 @@ func handleRegister(c *Core, w http.ResponseWriter, r *http.Request) {
 	if !request(c, w, r, &req) {
 		return
 	}
-	if req.RequestedTimeout <= 0 {
-		respondError(c, w, r, zqe.E(zqe.Invalid, "required parameter RequestedTimeout"))
+	if req.Timeout <= 0 {
+		respondError(c, w, r, zqe.E(zqe.Invalid, "required parameter timeout"))
 		return
 	}
 
@@ -48,11 +48,17 @@ func handleRegister(c *Core, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// directive is one of:
+	//  "reserved"   indicates to the worker that is has been reserved by a root process.
+	//  "reregister" indicates the request timed out without the worker being reserved,
+	//               and the worker should send another register request if possible.
+	//               Note that if the worker is running on a K8s node marked as
+	//               "Unschedulable" it should not reregister.
+	var directive string
 	var isCanceled bool
-	var directive api.WorkerDirective
 
 	ctx := r.Context()
-	timer := time.NewTimer(time.Duration(req.RequestedTimeout) * time.Millisecond)
+	timer := time.NewTimer(time.Duration(req.Timeout) * time.Millisecond)
 	defer timer.Stop()
 	select {
 	case rd := <-recruited:
@@ -61,10 +67,10 @@ func handleRegister(c *Core, w http.ResponseWriter, r *http.Request) {
 			zap.String("label", rd.Label),
 			zap.Int("count", rd.NumberRequested),
 		)
-		directive = api.Reserved
+		directive = "reserved"
 	case <-timer.C:
 		c.requestLogger(r).Info("Worker should reregister", zap.String("addr", req.Addr))
-		directive = api.Reregister
+		directive = "reregister"
 	case <-ctx.Done():
 		c.requestLogger(r).Info("handleRegister context cancel")
 		isCanceled = true

@@ -117,6 +117,7 @@ func NewCore(ctx context.Context, conf Config) (*Core, error) {
 	case "apiserver":
 		c.addAPIServerRoutes()
 	case "recruiter":
+		println("Im a recruiter")
 		c.workerPool = recruiter.NewWorkerPool()
 		c.addRecruiterRoutes()
 	case "worker":

@@ -1,22 +1,23 @@
 script: |
   source recruiter-curl.sh
-  curl -X POST -d '{"addr":"a.b.c:5000","node_name":"a.b"}' \
+  curl -X POST -d '{"addr":"a.b.c:5000","node_name":"a.b","timeout":1}' \
     http://$ZQD_HOST/recruiter/register 2> err
-  curl http://$ZQD_HOST/recruiter/stats 2> err
-  curl http://$ZQD_HOST/recruiter/listfree 2> err
-  curl -X POST -d '{"number_requested":1}' http://$ZQD_HOST/recruiter/recruit 2> err
-  curl -request GET http://$ZQD_HOST/recruiter/stats 2> err
-  # For the second register, the worker will be in the reserved pool,
-  # so it will not be reregistered.
-  curl -X POST -d '{"addr":"a.b.c:5000","node_name":"a.b"}' \
-    http://$ZQD_HOST/recruiter/register 2> err
-  curl -X POST -d '{"addrs":["a.b.c:5000"]}' \
-    http://$ZQD_HOST/recruiter/unreserve 2> err
-  curl -X POST -d '{"addr":"a.b.c:5000","node_name":"a.b"}' \
-    http://$ZQD_HOST/recruiter/register 2> err
-  curl -X POST -d '{"addr":"a.b.c:5000"}' \
-    http://$ZQD_HOST/recruiter/deregister 2> err
-  curl -X POST -d '{"number_requested":1}' http://$ZQD_HOST/recruiter/recruit 2> err
+  # curl http://$ZQD_HOST/recruiter/stats 2> err
+  # curl http://$ZQD_HOST/recruiter/listfree 2> err
+  # curl -X POST -d '{"number_requested":1}' http://$ZQD_HOST/recruiter/recruit 2> err
+  # curl -request GET http://$ZQD_HOST/recruiter/stats 2> err
+  # # For the second register, the worker will be in the reserved pool,
+  # # so it will not be reregistered.
+  # curl -X POST -d '{"addr":"a.b.c:5000","node_name":"a.b"}' \
+  #   http://$ZQD_HOST/recruiter/register 2> err
+  # curl -X POST -d '{"addrs":["a.b.c:5000"]}' \
+  #   http://$ZQD_HOST/recruiter/unreserve 2> err
+  # curl -X POST -d '{"addr":"a.b.c:5000","node_name":"a.b"}' \
+  #   http://$ZQD_HOST/recruiter/register 2> err
+  # curl -X POST -d '{"addr":"a.b.c:5000"}' \
+  #   http://$ZQD_HOST/recruiter/deregister 2> err
+  # curl -X POST -d '{"number_requested":1}' http://$ZQD_HOST/recruiter/recruit 2> err
+  cat zqd.log
 
 inputs:
   - name: recruiter-curl.sh

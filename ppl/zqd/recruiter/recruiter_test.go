@@ -10,9 +10,8 @@ import (
 
 func register1(t *testing.T, addr string, nodename string, fp int, np int, rp int) *WorkerPool {
 	wp := NewWorkerPool()
-	registered, err := wp.Register(addr, nodename)
+	err := wp.Register(addr, nodename, nil)
 	require.NoError(t, err)
-	assert.True(t, registered)
 	assertPoolLen(t, wp, fp, np, rp)
 	return wp
 }
@@ -25,25 +24,23 @@ func assertPoolLen(t *testing.T, wp *WorkerPool, fp int, np int, rp int) {
 
 func TestBadCalls(t *testing.T) {
 	wp := NewWorkerPool()
-	registered, err := wp.Register("a.b;;5000", "n1")
+	err := wp.Register("a.b;;5000", "n1", nil)
 	assert.NotNil(t, err)
-	assert.False(t, registered)
 	assertPoolLen(t, wp, 0, 0, 0)
-	registered, err = wp.Register("a.b:5000", "")
+	err = wp.Register("a.b:5000", "", nil)
 	assert.NotNil(t, err)
-	assert.False(t, registered)
 	assertPoolLen(t, wp, 0, 0, 0)
 }
 
 func TestRegisterTwice(t *testing.T) {
 	wp := register1(t, "a.b:5000", "n1", 1, 1, 0)
-	wp.Register("a.b:5000", "n1")
+	wp.Register("a.b:5000", "n1", nil)
 	assertPoolLen(t, wp, 1, 1, 0)
 }
 
 func TestDeregister1(t *testing.T) {
 	wp := register1(t, "a.b:5000", "n2", 1, 1, 0)
-	wp.Register("a.b:5001", "n2")
+	wp.Register("a.b:5001", "n2", nil)
 	wp.Deregister("a.b:5000")
 	assertPoolLen(t, wp, 1, 1, 0)
 }
@@ -60,11 +57,6 @@ func TestRecruit1(t *testing.T) {
 	// try recruiting 0 workers
 	_, err = wp.Recruit(0)
 	assert.EqualError(t, err, "recruit must request one or more workers: n=0")
-	// attempt to register reserved worker should be ignored
-	wp.Register(addr, nodename)
-	assertPoolLen(t, wp, 0, 0, 1)
-	wp.Unreserve([]string{addr})
-	assertPoolLen(t, wp, 0, 0, 0)
 	// recruit with none available returns empty list
 	s, err = wp.Recruit(1)
 	require.NoError(t, err)
@@ -79,9 +71,8 @@ func TestRegister10(t *testing.T) {
 		nodename = "n" + strconv.Itoa(i)
 		for j := 0; j < 2; j++ {
 			addr = nodename + ".x:" + strconv.Itoa(5000+j)
-			registered, err := wp.Register(addr, nodename)
+			err := wp.Register(addr, nodename, nil)
 			require.NoError(t, err)
-			assert.True(t, registered)
 		}
 	}
 	assertPoolLen(t, wp, 10, 5, 0)
@@ -98,9 +89,8 @@ func initNodesWithWorkers(t *testing.T, wp *WorkerPool, width int, height int) {
 		nodename = "n" + strconv.Itoa(i)
 		for j := 0; j < height; j++ {
 			addr = nodename + ".x:" + strconv.Itoa(5000+j)
-			registered, err := wp.Register(addr, nodename)
+			err := wp.Register(addr, nodename, nil)
 			require.NoError(t, err)
-			assert.True(t, registered)
 		}
 	}
 }
@@ -112,9 +102,8 @@ func initNodesOfVaryingSize(t *testing.T, wp *WorkerPool, size int) {
 		nodename = "n" + strconv.Itoa(i)
 		for j := 0; j < i+1; j++ {
 			addr = nodename + ".x:" + strconv.Itoa(5000+j)
-			registered, err := wp.Register(addr, nodename)
+			err := wp.Register(addr, nodename, nil)
 			require.NoError(t, err)
-			assert.True(t, registered)
 		}
 	}
 }
@@ -187,11 +176,11 @@ func TestRandomWithReregister(t *testing.T) {
 	numWorkers := size * (size + 1) / 2
 	assert.Equal(t, wp.LenFreePool(), numWorkers)
 	assert.Equal(t, wp.LenReservedPool(), 0)
-	q := make([][]WorkerDetail, qsize)
+	q := make([][]*WorkerDetail, qsize)
 	// The Reregister Queue is initialized with empty lists, then
 	// previously recruited lists of workers are shuffled in.
 	for i := 0; i < qsize; i++ {
-		q[i] = make([]WorkerDetail, 0)
+		q[i] = make([]*WorkerDetail, 0)
 	}
 	remainingWorkers := numWorkers
 	for i := 0; i < size; i++ {
@@ -213,8 +202,7 @@ func TestRandomWithReregister(t *testing.T) {
 			q = q[1:]
 
 			for _, wd := range reregisterNow {
-				wp.Unreserve([]string{wd.Addr})
-				wp.Register(wd.Addr, wd.NodeName)
+				wp.Register(wd.Addr, wd.NodeName, nil)
 				require.NoError(t, err)
 			}
 			remainingWorkers += len(reregisterNow)
@@ -242,9 +230,9 @@ func TestRandomRecruitDetectSiblings(t *testing.T) {
 	numWorkers := width * height
 	assert.Equal(t, wp.LenFreePool(), numWorkers)
 	assert.Equal(t, wp.LenReservedPool(), 0)
-	q := make([][]WorkerDetail, qsize)
+	q := make([][]*WorkerDetail, qsize)
 	for i := 0; i < qsize; i++ {
-		q[i] = make([]WorkerDetail, 0)
+		q[i] = make([]*WorkerDetail, 0)
 	}
 	remainingWorkers := numWorkers
 	for i := 0; i < iterations; i++ {
@@ -266,8 +254,7 @@ func TestRandomRecruitDetectSiblings(t *testing.T) {
 			q = q[1:]
 
 			for _, wd := range reregisterNow {
-				wp.Unreserve([]string{wd.Addr})
-				wp.Register(wd.Addr, wd.NodeName)
+				wp.Register(wd.Addr, wd.NodeName, nil)
 				require.NoError(t, err)
 			}
 			remainingWorkers += len(reregisterNow)
