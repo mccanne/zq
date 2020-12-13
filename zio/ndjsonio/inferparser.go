@@ -204,5 +204,5 @@ func (p *inferParser) parseString(b []byte) (zng.Value, error) {
 }
 
 func (p *inferParser) parseNull() (zng.Value, error) {
-	return zng.Value{zng.TypeString, nil}, nil
+	return zng.Value{zng.TypeNull, nil}, nil
 }

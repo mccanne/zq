@@ -1,0 +1,8 @@
+zql: put typeof(n)
+
+input: |
+  { "n": null }
+
+output: |
+  #0:record[n:null]
+  0:[-;]
