@@ -417,12 +417,12 @@ func TestInterfaceMarshal(t *testing.T) {
 	zctx := resolver.NewContext()
 	zv, err := resolver.MarshalValue(zctx, t1)
 	require.NoError(t, err)
-	assert.Equal(t, "ThingTwo=({c:string})", zv.Type.ZSON())
+	assert.Equal(t, "resolver_test.ThingTwo=({c:string})", zv.Type.ZSON())
 
 	rolls := Rolls{1, 2, 3}
 	zv, err = resolver.MarshalValue(zctx, rolls)
 	require.NoError(t, err)
-	assert.Equal(t, "Rolls=([int64])", zv.Type.ZSON())
+	assert.Equal(t, "resolver_test.Rolls=([int64])", zv.Type.ZSON())
 
 	plain := []int32{1, 2, 3}
 	zv, err = resolver.MarshalValue(zctx, plain)

@@ -97,7 +97,9 @@ func encodeAny(zctx *Context, b *zcode.Builder, v reflect.Value, types bool) (zn
 		name := v.Type().Name()
 		kind := v.Kind().String()
 		if name != "" && name != kind {
-			return zctx.LookupTypeAlias(name, typ)
+			path := strings.Split(v.Type().PkgPath(), "/")
+			module := path[len(path)-1]
+			return zctx.LookupTypeAlias(module+"."+name, typ)
 		}
 	}
 	return typ, nil
