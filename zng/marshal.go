@@ -26,6 +26,11 @@ type Marshaler interface {
 	MarshalZNG(TypeContext, *zcode.Builder) (Type, error)
 }
 
+type MarshalContext struct {
+	zctx TypeContext
+	// more stuff will go here in a subsequent PR
+}
+
 func Marshal(zctx TypeContext, b *zcode.Builder, v interface{}) (Type, error) {
 	return encodeAny(zctx, b, reflect.ValueOf(v))
 }
