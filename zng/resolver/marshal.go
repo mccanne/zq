@@ -23,7 +23,16 @@ type Marshaler interface {
 }
 
 func Marshal(zctx *Context, b *zcode.Builder, v interface{}) (zng.Type, error) {
-	return encodeAny(zctx, b, reflect.ValueOf(v))
+	return encodeAny(zctx, b, reflect.ValueOf(v), false)
+}
+
+func MarshalValue(zctx *Context, v interface{}) (zng.Value, error) {
+	var b zcode.Builder
+	typ, err := encodeAny(zctx, &b, reflect.ValueOf(v), true)
+	if err != nil {
+		return zng.Value{}, err
+	}
+	return zng.Value{typ, b.Bytes()}, nil
 }
 
 func MarshalRecord(zctx *Context, v interface{}) (*zng.Record, error) {
@@ -79,7 +88,22 @@ func fieldName(f reflect.StructField) string {
 	return f.Name
 }
 
-func encodeAny(zctx *Context, b *zcode.Builder, v reflect.Value) (zng.Type, error) {
+func encodeAny(zctx *Context, b *zcode.Builder, v reflect.Value, types bool) (zng.Type, error) {
+	typ, err := encodeAnyValue(zctx, b, v, types)
+	if err != nil {
+		return nil, err
+	}
+	if types && v.IsValid() {
+		name := v.Type().Name()
+		kind := v.Kind().String()
+		if name != "" && name != kind {
+			return zctx.LookupTypeAlias(name, typ)
+		}
+	}
+	return typ, nil
+}
+
+func encodeAnyValue(zctx *Context, b *zcode.Builder, v reflect.Value, types bool) (zng.Type, error) {
 	if !v.IsValid() {
 		b.AppendPrimitive(nil)
 		return zng.TypeNull, nil
@@ -93,19 +117,19 @@ func encodeAny(zctx *Context, b *zcode.Builder, v reflect.Value) (zng.Type, erro
 	}
 	switch v.Kind() {
 	case reflect.Array:
-		return encodeArray(zctx, b, v)
+		return encodeArray(zctx, b, v, types)
 	case reflect.Slice:
 		if v.IsNil() {
 			return encodeNil(zctx, b, v.Type())
 		}
-		return encodeArray(zctx, b, v)
+		return encodeArray(zctx, b, v, types)
 	case reflect.Struct:
-		return encodeRecord(zctx, b, v)
+		return encodeRecord(zctx, b, v, types)
 	case reflect.Ptr:
 		if v.IsNil() {
 			return encodeNil(zctx, b, v.Type())
 		}
-		return encodeAny(zctx, b, v.Elem())
+		return encodeAny(zctx, b, v.Elem(), types)
 	case reflect.String:
 		b.AppendPrimitive(zng.EncodeString(v.String()))
 		return zng.TypeString, nil
@@ -148,14 +172,14 @@ func encodeNil(zctx *Context, b *zcode.Builder, t reflect.Type) (zng.Type, error
 	return typ, nil
 }
 
-func encodeRecord(zctx *Context, b *zcode.Builder, sval reflect.Value) (zng.Type, error) {
+func encodeRecord(zctx *Context, b *zcode.Builder, sval reflect.Value, types bool) (zng.Type, error) {
 	b.BeginContainer()
 	var columns []zng.Column
 	stype := sval.Type()
 	for i := 0; i < stype.NumField(); i++ {
 		field := stype.Field(i)
 		name := fieldName(field)
-		typ, err := encodeAny(zctx, b, sval.Field(i))
+		typ, err := encodeAny(zctx, b, sval.Field(i), types)
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +193,7 @@ func isIP(typ reflect.Type) bool {
 	return typ.Name() == "IP" && typ.PkgPath() == "net"
 }
 
-func encodeArray(zctx *Context, b *zcode.Builder, arrayVal reflect.Value) (zng.Type, error) {
+func encodeArray(zctx *Context, b *zcode.Builder, arrayVal reflect.Value, types bool) (zng.Type, error) {
 	if isIP(arrayVal.Type()) {
 		b.AppendPrimitive(zng.EncodeIP(arrayVal.Bytes()))
 		return zng.TypeIP, nil
@@ -179,7 +203,7 @@ func encodeArray(zctx *Context, b *zcode.Builder, arrayVal reflect.Value) (zng.T
 	var innerType zng.Type
 	for i := 0; i < len; i++ {
 		item := arrayVal.Index(i)
-		typ, err := encodeAny(zctx, b, item)
+		typ, err := encodeAny(zctx, b, item, types)
 		if err != nil {
 			return nil, err
 		}
@@ -199,6 +223,8 @@ func encodeArray(zctx *Context, b *zcode.Builder, arrayVal reflect.Value) (zng.T
 
 func lookupType(zctx *Context, typ reflect.Type) (zng.Type, error) {
 	switch typ.Kind() {
+	//case reflect.Interface:
+	//	return lookupTypeAlias(zctx, typ)
 	case reflect.Array, reflect.Slice:
 		typ, err := lookupType(zctx, typ.Elem())
 		if err != nil {

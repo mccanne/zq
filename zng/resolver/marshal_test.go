@@ -388,3 +388,44 @@ func TestCustomRecord(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, trim(exp), rectzng(t, rec))
 }
+
+type ThingTwo struct {
+	C string `zng:"c"`
+}
+
+type ThingaMaBob interface {
+	Who() string
+}
+
+func (t *Thing) Who() string    { return t.A }
+func (t *ThingTwo) Who() string { return t.C }
+
+func Make(which int) ThingaMaBob {
+	if which == 1 {
+		return &Thing{A: "It's a thing one"}
+	}
+	if which == 2 {
+		return &ThingTwo{"It'sa  thing two"}
+	}
+	return nil
+}
+
+type Rolls []int
+
+func TestInterfaceMarshal(t *testing.T) {
+	t1 := Make(2)
+	zctx := resolver.NewContext()
+	zv, err := resolver.MarshalValue(zctx, t1)
+	require.NoError(t, err)
+	assert.Equal(t, "ThingTwo=({c:string})", zv.Type.ZSON())
+
+	rolls := Rolls{1, 2, 3}
+	zv, err = resolver.MarshalValue(zctx, rolls)
+	require.NoError(t, err)
+	assert.Equal(t, "Rolls=([int64])", zv.Type.ZSON())
+
+	plain := []int32{1, 2, 3}
+	zv, err = resolver.MarshalValue(zctx, plain)
+	require.NoError(t, err)
+	assert.Equal(t, "[int32]", zv.Type.ZSON())
+}
