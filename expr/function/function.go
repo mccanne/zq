@@ -135,6 +135,10 @@ func New(zctx *resolver.Context, name string, narg int) (Interface, error) {
 	case "network_of":
 		argmax = 2
 		f = &networkOf{}
+	case "reshape":
+		argmin = 2
+		argmax = 2
+		f = &reshape{}
 	}
 	if argmin != -1 && narg < argmin {
 		return nil, ErrTooFewArgs
