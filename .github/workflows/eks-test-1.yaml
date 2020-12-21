@@ -35,4 +35,8 @@ jobs:
           sleep 2 # wait for port-forwards to complete
           curl http://localhost:8020/recruiter/listfree        
           zapi ls 
-          echo "Number of Workers: ${{ github.event.inputs.numWorkers }}"
+          # echo "Number of Workers: ${{ github.event.inputs.numWorkers }}"
+      - run: |
+         time zapi -id sp_1lQzT9N8bRG3aW6kcLDPUbdEJH3 get -workers 1 -t '"FgzbkQ15TOoOENn1lb" | sort tx_hosts'
+         time zapi -id sp_1lQzT9N8bRG3aW6kcLDPUbdEJH3 get -workers 2 -t '"FgzbkQ15TOoOENn1lb" | sort tx_hosts'
+         time zapi -id sp_1lQzT9N8bRG3aW6kcLDPUbdEJH3 get -workers 4 -t '"FgzbkQ15TOoOENn1lb" | sort tx_hosts'
