@@ -376,7 +376,7 @@ func TestGroupbyUnit(t *testing.T) {
 
 			astProc, err := compileGroupBy(zql)
 			assert.NoError(t, err)
-			compiler.ReplaceGroupByProcDurationWithKey(astProc)
+			compiler.SemanticTransform(astProc)
 			astProc.InputSortDir = dir
 			tctx := proctest.NewTestContext(resolver)
 			src := proctest.NewTestSource(inBatches)

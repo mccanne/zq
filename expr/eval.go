@@ -701,17 +701,16 @@ func (c *Conditional) Eval(rec *zng.Record) (zng.Value, error) {
 }
 
 type Call struct {
-	zctx  *resolver.Context
-	name  string
-	fn    function.Interface
-	exprs []Evaluator
-	args  []zng.Value
+	zctx    *resolver.Context
+	fn      function.Interface
+	exprs   []Evaluator
+	args    []zng.Value
+	AddRoot bool
 }
 
-func NewCall(zctx *resolver.Context, name string, fn function.Interface, exprs []Evaluator) *Call {
+func NewCall(zctx *resolver.Context, fn function.Interface, exprs []Evaluator) *Call {
 	return &Call{
 		zctx:  zctx,
-		name:  name,
 		fn:    fn,
 		exprs: exprs,
 		args:  make([]zng.Value, len(exprs)),
@@ -727,6 +726,28 @@ func (c *Call) Eval(rec *zng.Record) (zng.Value, error) {
 		c.args[k] = val
 	}
 	return c.fn.Call(c.args)
+}
+
+type Be struct {
+	zctx  *resolver.Context
+	exprs []Evaluator
+}
+
+func NewBe(zctx *resolver.Context, exprs []Evaluator) *Be {
+	return &Be{
+		zctx:  zctx,
+		exprs: exprs,
+	}
+}
+
+func (b *Be) Eval(rec *zng.Record) (zng.Value, error) {
+	for _, e := range b.exprs {
+		zv, err := e.Eval(rec)
+		if err != nil || zv.Type == zng.TypeError {
+			return zng.False, nil
+		}
+	}
+	return zng.True, nil
 }
 
 func NewCast(expr Evaluator, styp string) (Evaluator, error) {

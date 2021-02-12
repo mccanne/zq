@@ -322,6 +322,9 @@ func (l *Lexer) scanTypeName() (string, error) {
 	for {
 		r, n, err := l.peekRune()
 		if err != nil {
+			if err == io.EOF {
+				return s.String(), nil
+			}
 			return "", err
 		}
 		if !zng.TypeChar(r) {

@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/brimsec/zq/ast"
@@ -172,30 +171,34 @@ func compileFilter(zctx *resolver.Context, scope *Scope, node ast.Expression) (e
 		if f, err := compileCompareField(zctx, scope, v); f != nil || err != nil {
 			return f, err
 		}
-		predicate, err := compileExpr(zctx, scope, v)
-		if err != nil {
-			return nil, err
-		}
-		return func(rec *zng.Record) bool {
-			zv, err := predicate.Eval(rec)
-			if err != nil {
-				return false
-			}
-			if zv.Type == zng.TypeBool && zng.IsTrue(zv.Bytes) {
-				return true
-			}
-			return false
-		}, nil
+		return compilExprPredicate(zctx, scope, v)
 
 	case *ast.FunctionCall:
 		if f, err := compileCompareAny(v); f != nil || err != nil {
 			return f, err
 		}
-		return nil, errors.New("top-level function calls not yet supported in search context")
+		return compilExprPredicate(zctx, scope, v)
 
 	default:
 		return nil, fmt.Errorf("Filter AST unknown type: %v", v)
 	}
+}
+
+func compilExprPredicate(zctx *resolver.Context, scope *Scope, e ast.Expression) (expr.Filter, error) {
+	predicate, err := compileExpr(zctx, scope, e)
+	if err != nil {
+		return nil, err
+	}
+	return func(rec *zng.Record) bool {
+		zv, err := predicate.Eval(rec)
+		if err != nil {
+			return false
+		}
+		if zv.Type == zng.TypeBool && zng.IsTrue(zv.Bytes) {
+			return true
+		}
+		return false
+	}, nil
 }
 
 func compileCompareAny(e *ast.FunctionCall) (expr.Filter, error) {

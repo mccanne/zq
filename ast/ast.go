@@ -316,6 +316,13 @@ func (*RenameProc) ProcNode()     {}
 func (*FuseProc) ProcNode()       {}
 func (*JoinProc) ProcNode()       {}
 
+// A FunctionCall can also represent a proc that is either a group-by
+// with no group-by keys and every duration or a filter with a function
+// that is boolean valued.  This is determined by the compiler rather
+// than the syntax tree based on the specific functions and aggregators
+// tha are defined at compile time.
+func (*FunctionCall) ProcNode() {}
+
 // A Reducer is an AST node that represents a reducer function.  The Operator
 // field indicates the aggregation method while the Expr field indicates
 // an expression applied to the incoming records that is operated upon by them

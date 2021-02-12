@@ -121,6 +121,13 @@ func unpackProc(custom Unpacker, node joe.Interface) (Proc, error) {
 			return nil, err
 		}
 		return &FilterProc{Filter: filter}, nil
+	case "FunctionCall":
+		// A FuncionCall can appear in proc context too.
+		args, err := unpackArgs(node)
+		if err != nil {
+			return nil, err
+		}
+		return &FunctionCall{Args: args}, nil
 	case "PutProc":
 		a, _ := node.Get("clauses")
 		clauses, err := unpackAssignments(a)
@@ -300,21 +307,9 @@ func UnpackExpression(node joe.Interface) (Expression, error) {
 			Else:      elseClause,
 		}, nil
 	case "FunctionCall":
-		argsNode, err := node.Get("args")
+		args, err := unpackArgs(node)
 		if err != nil {
-			return nil, errors.New("FunctionCall missing args")
-		}
-		a, ok := argsNode.(joe.Array)
-		if !ok {
-			return nil, errors.New("FunctionCall args property must be an array")
-		}
-		args := make([]Expression, len(a))
-		for i := range args {
-			var err error
-			args[i], err = UnpackExpression(a[i])
-			if err != nil {
-				return nil, err
-			}
+			return nil, err
 		}
 		return &FunctionCall{Args: args}, nil
 	case "CastExpr":
@@ -350,6 +345,26 @@ func UnpackExpression(node joe.Interface) (Expression, error) {
 	default:
 		return nil, fmt.Errorf("ast.UnpackExpression: unknown op %s", op)
 	}
+}
+
+func unpackArgs(node joe.Interface) ([]Expression, error) {
+	argsNode, err := node.Get("args")
+	if err != nil {
+		return nil, errors.New("ast node missing function args field")
+	}
+	a, ok := argsNode.(joe.Array)
+	if !ok {
+		return nil, errors.New("function args property must be an array")
+	}
+	args := make([]Expression, len(a))
+	for i := range args {
+		var err error
+		args[i], err = UnpackExpression(a[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return args, nil
 }
 
 func unpackBinaryExpr(node joe.Interface) (*BinaryExpression, error) {

@@ -82,6 +82,7 @@ Operation
       RETURN(MAP("op": "ParallelProc", "procs": procArray))
     }
   / Operator
+  / f:Function !(ExprGuard / (_ ("by" / "with" / "where")) / (__ ",")) { RETURN(f) }
   / a:Aggregation !ExprGuard  { RETURN(a) }
   / expr:SearchBoolean !AggGuard {
       RETURN(MAP("op": "FilterProc", "filter": expr))

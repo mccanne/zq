@@ -6,6 +6,7 @@ import (
 
 	"github.com/brimsec/zq/ast"
 	"github.com/brimsec/zq/expr"
+	"github.com/brimsec/zq/expr/agg"
 	"github.com/brimsec/zq/field"
 	"github.com/brimsec/zq/proc"
 	"github.com/brimsec/zq/proc/combine"
@@ -183,6 +184,13 @@ func compileProc(custom Hook, node ast.Proc, pctx *proc.Context, scope *Scope, p
 	case *ast.FuseProc:
 		return fuse.New(pctx, parent)
 
+	case *ast.FunctionCall:
+		p, err := convertFunctionProc(v)
+		if err != nil {
+			return nil, err
+		}
+		return compileProc(custom, p, pctx, scope, parent)
+
 	case *ast.JoinProc:
 		return nil, ErrJoinParents
 
@@ -202,6 +210,34 @@ func compileAssignments(assignments []ast.Assignment, zctx *resolver.Context, sc
 		keys = append(keys, a)
 	}
 	return keys, nil
+}
+
+// convertFunctionProc converts a function proc ast node to a group-by or
+// an filter-proc based on the name of the function.  This way a function
+// of the form `... | has(...) | ...` can be distinguish from `count()`
+// by the name lookup.
+func convertFunctionProc(call *ast.FunctionCall) (ast.Proc, error) {
+	if _, err := agg.NewPattern(call.Function); err != nil {
+		// Assume it's a valid function and convert.  If not,
+		// the compiler will report an unknown function error.
+		return ast.FilterToProc(call), nil
+	}
+	var e ast.Expression
+	if len(call.Args) > 1 {
+		return nil, fmt.Errorf("%s: wrong number of arguments", call.Function)
+	}
+	if len(call.Args) == 1 {
+		e = call.Args[0]
+	}
+	reducer := &ast.Reducer{
+		Op:       "Reducer",
+		Operator: call.Function,
+		Expr:     e,
+	}
+	return &ast.GroupByProc{
+		Op:       "GroupByProc",
+		Reducers: []ast.Assignment{{RHS: reducer}},
+	}, nil
 }
 
 func splitAssignments(assignments []expr.Assignment) ([]field.Static, []expr.Evaluator) {

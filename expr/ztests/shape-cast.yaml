@@ -1,9 +1,9 @@
 zql: |
    put
    // cast to type with same field order
-   id=cast(id, "({orig_h:ip,orig_p:port=(uint16),resp_h:ip,resp_p:port})"),
+   id=cast(id, "{orig_h:ip,orig_p:port=(uint16),resp_h:ip,resp_p:port}"),
    // cast to type with different field order, does not change output order
-   id2=cast(id, "({resp_h:ip,resp_p:port=(uint16),orig_h:ip,orig_p:port})")
+   id2=cast(id, "{resp_h:ip,resp_p:port=(uint16),orig_h:ip,orig_p:port}")
 
 
 input: |

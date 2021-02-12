@@ -22,13 +22,14 @@ type Interface interface {
 	Call([]zng.Value) (zng.Value, error)
 }
 
-func New(zctx *resolver.Context, name string, narg int) (Interface, error) {
+func New(zctx *resolver.Context, name string, narg int) (Interface, bool, error) {
 	argmin := 1
 	argmax := 1
+	var root bool
 	var f Interface
 	switch name {
 	default:
-		return nil, ErrNoSuchFunction
+		return nil, false, ErrNoSuchFunction
 	case "len":
 		f = &lenFn{}
 	case "abs":
@@ -90,6 +91,19 @@ func New(zctx *resolver.Context, name string, narg int) (Interface, error) {
 		f = &trunc{}
 	case "typeof":
 		f = &typeOf{zson.NewTypeTable(zctx)}
+	case "fields":
+		typ := zctx.LookupTypeArray(zng.TypeString)
+		f = &fields{types: zson.NewTypeTable(zctx), typ: typ}
+	case "has":
+		argmin = 1
+		argmax = 2
+		root = true
+		f = &has{zson.NewTypeTable(zctx)}
+	case "is":
+		argmin = 1
+		argmax = 2
+		root = true
+		f = &is{types: zson.NewTypeTable(zctx)}
 	case "iserr":
 		f = &isErr{}
 	case "to_base64":
@@ -101,12 +115,12 @@ func New(zctx *resolver.Context, name string, narg int) (Interface, error) {
 		f = &networkOf{}
 	}
 	if argmin != -1 && narg < argmin {
-		return nil, ErrTooFewArgs
+		return nil, false, ErrTooFewArgs
 	}
 	if argmax != -1 && narg > argmax {
-		return nil, ErrTooManyArgs
+		return nil, false, ErrTooManyArgs
 	}
-	return f, nil
+	return f, root, nil
 }
 
 func zverr(msg string, err error) (zng.Value, error) {
@@ -154,6 +168,31 @@ type isErr struct{}
 
 func (*isErr) Call(args []zng.Value) (zng.Value, error) {
 	if args[0].IsError() {
+		return zng.True, nil
+	}
+	return zng.False, nil
+}
+
+type is struct {
+	types *zson.TypeTable
+}
+
+func (i *is) Call(args []zng.Value) (zng.Value, error) {
+	zvSubject := args[0]
+	zvTypeVal := args[1]
+	if len(args) == 3 {
+		zvSubject = args[1]
+		zvTypeVal = args[2]
+	}
+	if !zvTypeVal.IsStringy() {
+		return zng.False, nil
+	}
+	s, err := zng.DecodeString(zvTypeVal.Bytes)
+	if err != nil {
+		return zng.Value{}, err
+	}
+	typ, err := i.types.LookupType(s)
+	if err == nil && typ == zvSubject.Type {
 		return zng.True, nil
 	}
 	return zng.False, nil

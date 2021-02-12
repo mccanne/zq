@@ -71,8 +71,6 @@ func DotExprToString(e Evaluator) (string, error) {
 
 func DotExprToField(e Evaluator) (field.Static, error) {
 	switch e := e.(type) {
-	case *Call:
-		return field.New(e.name), nil
 	case *RootRecord:
 		return field.NewRoot(), nil
 	case *DotExpr:

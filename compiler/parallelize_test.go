@@ -119,10 +119,14 @@ func TestParallelizeFlowgraph(t *testing.T) {
 			ok := IsParallelizable(query.(*ast.SequentialProc), sf(tc.orderField), false)
 			require.Equal(t, ok, tc.zql != tc.expected)
 
-			parallelized, ok := Parallelize(query.(*ast.SequentialProc), 2, sf(tc.orderField), false)
+			seq, err := SemanticTransform(query.(*ast.SequentialProc))
+			require.NoError(t, err)
+			parallelized, ok := Parallelize(seq, 2, sf(tc.orderField), false)
 			require.Equal(t, ok, tc.zql != tc.expected)
 
-			expected, err := ParseProc(tc.expected)
+			expectedProc, err := ParseProc(tc.expected)
+			require.NoError(t, err)
+			expected, err := SemanticTransform(expectedProc)
 			require.NoError(t, err)
 
 			// If the parallelized flowgraph includes a groupby, then adjust the expected AST by setting
@@ -183,7 +187,7 @@ func TestSetGroupByProcInputSortDir(t *testing.T) {
 		t.Run(tc.zql, func(t *testing.T) {
 			query, err := ParseProc(tc.zql)
 			require.NoError(t, err)
-			ReplaceGroupByProcDurationWithKey(query)
+			SemanticTransform(query)
 			outputSorted := setGroupByProcInputSortDir(query, sf(tc.inputSortField), 1)
 			require.Equal(t, tc.outputSorted, outputSorted)
 

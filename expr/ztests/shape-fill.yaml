@@ -1,4 +1,4 @@
-zql: put . = fill(., "({a:{b:{c:string}}})")
+zql: put . = fill(., "{a:{b:{c:string}}}")
 
 input: |
   #0:record[s:string]
@@ -14,4 +14,3 @@ output: |
   #1:record[a:record[s:string,b:record[c:string]]]
   1:[-;]
   1:[[-;-;]]
-

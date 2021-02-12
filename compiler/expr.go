@@ -472,16 +472,27 @@ func compileCall(zctx *resolver.Context, scope *Scope, node ast.FunctionCall) (e
 	if e, err := compileMethodChain(zctx, scope, node); e != nil || err != nil {
 		return e, err
 	}
+	if node.Function == "be" {
+		exprs, err := compileExprs(zctx, scope, node.Args)
+		if err != nil {
+			return nil, fmt.Errorf("be: bad argument: %w", err)
+		}
+		return expr.NewBe(zctx, exprs), nil
+	}
 	nargs := len(node.Args)
-	fn, err := function.New(zctx, node.Function, nargs)
+	fn, root, err := function.New(zctx, node.Function, nargs)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", node.Function, err)
 	}
-	exprs, err := compileExprs(zctx, scope, node.Args)
+	args := node.Args
+	if root {
+		args = append([]ast.Expression{&ast.RootRecord{}}, args...)
+	}
+	exprs, err := compileExprs(zctx, scope, args)
 	if err != nil {
 		return nil, fmt.Errorf("%s: bad argument: %w", node.Function, err)
 	}
-	return expr.NewCall(zctx, node.Function, fn, exprs), nil
+	return expr.NewCall(zctx, fn, exprs), nil
 }
 
 func compileExprs(zctx *resolver.Context, scope *Scope, in []ast.Expression) ([]expr.Evaluator, error) {
