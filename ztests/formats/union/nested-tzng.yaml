@@ -1,0 +1,15 @@
+zql: '*'
+
+input: |
+  #0:record[a:union[string,array[int32],array[string],union[string,int32]]]
+  0:[0:"hello";]
+  0:[1:[1;2;]]
+  0:[2:["a";"b";]]
+  0:[3:1:123;]
+
+output: |
+  #0:record[a:union[string,array[int32],array[string],union[string,int32]]]
+  0:[0:"hello";]
+  0:[1:[1;2;]]
+  0:[2:["a";"b";]]
+  0:[3:1:123;]

@@ -1,0 +1,11 @@
+zql: '*'
+
+input: |
+  #0:record[a:array[union[int32,string]]]
+  0:[[1:asdfasdf;-;0:100;]]
+  0:[-;]
+
+output: |
+  #0:record[a:array[union[int32,string]]]
+  0:[[1:asdfasdf;-;0:100;]]
+  0:[-;]
