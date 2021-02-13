@@ -1,9 +1,0 @@
-zql: '*'
-
-input: !!binary +QIHEPYBAWEXGAwXBAISYXNkZmFzZGYYBAcCBAIYAQD/
-
-output: |
-  #0:record[a:union[int64,string]]
-  0:[1:asdfasdf;]
-  0:[0:1;]
-  0:[-;]
