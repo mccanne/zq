@@ -36,7 +36,7 @@ func (f *fields) Call(args []zng.Value) (zng.Value, error) {
 		// To do this, need to move ErrNoSuchField=>ErrMissing to zng
 		return zng.NewError(errors.New("missing value")), nil
 	}
-	bytes := f.bytes[0:]
+	bytes := f.bytes[:0]
 	for _, field := range fieldNames(typ) {
 		bytes = zcode.AppendPrimitive(bytes, zcode.Bytes(field))
 	}
