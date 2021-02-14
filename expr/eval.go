@@ -728,21 +728,21 @@ func (c *Call) Eval(rec *zng.Record) (zng.Value, error) {
 	return c.fn.Call(c.args)
 }
 
-type Be struct {
+type Exists struct {
 	zctx  *resolver.Context
 	exprs []Evaluator
 }
 
-func NewBe(zctx *resolver.Context, exprs []Evaluator) *Be {
-	return &Be{
+func NewExists(zctx *resolver.Context, exprs []Evaluator) *Exists {
+	return &Exists{
 		zctx:  zctx,
 		exprs: exprs,
 	}
 }
 
-func (b *Be) Eval(rec *zng.Record) (zng.Value, error) {
-	for _, e := range b.exprs {
-		zv, err := e.Eval(rec)
+func (e *Exists) Eval(rec *zng.Record) (zng.Value, error) {
+	for _, expr := range e.exprs {
+		zv, err := expr.Eval(rec)
 		if err != nil || zv.Type == zng.TypeError {
 			return zng.False, nil
 		}

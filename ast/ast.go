@@ -317,7 +317,7 @@ func (*FuseProc) ProcNode()       {}
 func (*JoinProc) ProcNode()       {}
 
 // A FunctionCall can also represent a proc that is either a group-by
-// with no group-by keys and every duration or a filter with a function
+// with no group-by keys and no duration or a filter with a function
 // that is boolean valued.  This is determined by the compiler rather
 // than the syntax tree based on the specific functions and aggregators
 // tha are defined at compile time.

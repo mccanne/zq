@@ -472,12 +472,12 @@ func compileCall(zctx *resolver.Context, scope *Scope, node ast.FunctionCall) (e
 	if e, err := compileMethodChain(zctx, scope, node); e != nil || err != nil {
 		return e, err
 	}
-	if node.Function == "be" {
+	if node.Function == "exists" {
 		exprs, err := compileExprs(zctx, scope, node.Args)
 		if err != nil {
-			return nil, fmt.Errorf("be: bad argument: %w", err)
+			return nil, fmt.Errorf("exists: bad argument: %w", err)
 		}
-		return expr.NewBe(zctx, exprs), nil
+		return expr.NewExists(zctx, exprs), nil
 	}
 	nargs := len(node.Args)
 	fn, root, err := function.New(zctx, node.Function, nargs)
