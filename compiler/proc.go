@@ -212,10 +212,10 @@ func compileAssignments(assignments []ast.Assignment, zctx *resolver.Context, sc
 	return keys, nil
 }
 
-// convertFunctionProc converts a function proc ast node to a group-by or
-// an filter-proc based on the name of the function.  This way a function
-// of the form `... | has(...) | ...` can be distinguish from `count()`
-// by the name lookup.
+// convertFunctionProc converts a FunctionCall ast node at proc level
+// to a group-by or a filter-proc based on the name of the function.
+// This way, Z of the form `... | exists(...) | ...` can be distinguished
+// from `count()` by the name lookup here at compile time.
 func convertFunctionProc(call *ast.FunctionCall) (ast.Proc, error) {
 	if _, err := agg.NewPattern(call.Function); err != nil {
 		// Assume it's a valid function and convert.  If not,
