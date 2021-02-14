@@ -109,7 +109,13 @@ func SemanticTransform(p ast.Proc) (ast.Proc, error) {
 			}
 		}
 	case *ast.FunctionCall:
-		return convertFunctionProc(p)
+		converted, err := convertFunctionProc(p)
+		if err != nil {
+			return nil, err
+		}
+		// The conversion may be a group-by so we recursively
+		// invoke the transformation here...
+		return SemanticTransform(converted)
 	}
 	return p, nil
 }
