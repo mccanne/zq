@@ -33,7 +33,8 @@ func (f *fields) Call(args []zng.Value) (zng.Value, error) {
 	typ := isRecordType(zvSubject, f.types)
 	if typ == nil {
 		//XXX create a zng.Missing which is ErrMissing as zng.Value
-		// To do this, need to move ErrNoSuchField=>ErrMissing to zng
+		// To do this, need to move ErrNoSuchField=>ErrMissing to zng.
+		// See issue #2130.
 		return zng.NewError(errors.New("missing value")), nil
 	}
 	bytes := f.bytes[:0]
