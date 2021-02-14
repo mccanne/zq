@@ -94,11 +94,6 @@ func New(zctx *resolver.Context, name string, narg int) (Interface, bool, error)
 	case "fields":
 		typ := zctx.LookupTypeArray(zng.TypeString)
 		f = &fields{types: zson.NewTypeTable(zctx), typ: typ}
-	case "has":
-		argmin = 1
-		argmax = 2
-		root = true
-		f = &has{zson.NewTypeTable(zctx)}
 	case "is":
 		argmin = 1
 		argmax = 2

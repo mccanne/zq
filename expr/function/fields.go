@@ -68,23 +68,3 @@ func isRecordType(zv zng.Value, types *zson.TypeTable) *zng.TypeRecord {
 	}
 	return nil
 }
-
-func (h *has) Call(args []zng.Value) (zng.Value, error) {
-	zvSubject := args[0]
-	zvField := args[1]
-	if len(args) == 3 {
-		zvSubject = args[1]
-		zvField = args[2]
-	}
-	if !zvField.IsStringy() {
-		return zng.NewErrorf("field name in has() is not a string"), nil
-	}
-	field, err := zng.DecodeString(zvField.Bytes)
-	if err != nil {
-		return zng.Value{}, err
-	}
-	if typ := isRecordType(zvSubject, h.types); typ.HasField(field) {
-		return zng.True, nil
-	}
-	return zng.False, nil
-}
