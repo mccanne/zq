@@ -80,7 +80,8 @@ func NewLogOp(ctx context.Context, store storage.Storage, req api.LogPostRequest
 		p.readCounters = append(p.readCounters, rc)
 
 		if proc != nil {
-			zr, err = driver.NewReader(ctx, proc, p.zctx, zr)
+			program := &ast.Program{Entry: proc}
+			zr, err = driver.NewReader(ctx, program, p.zctx, zr)
 			if err != nil {
 				return nil, err
 			}

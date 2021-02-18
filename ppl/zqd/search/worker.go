@@ -70,8 +70,8 @@ func (w *WorkerOp) Run(ctx context.Context, output Output) (err error) {
 	statsTicker := time.NewTicker(StatsInterval)
 	defer statsTicker.Stop()
 	zctx := resolver.NewContext()
-
-	return driver.MultiRun(ctx, d, w.proc, zctx, w.store.StaticSource(w.src), driver.MultiConfig{
+	program := &ast.Program{Entry: w.proc}
+	return driver.MultiRun(ctx, d, program, zctx, w.store.StaticSource(w.src), driver.MultiConfig{
 		Logger:    w.logger,
 		Span:      w.span,
 		StatsTick: statsTicker.C,

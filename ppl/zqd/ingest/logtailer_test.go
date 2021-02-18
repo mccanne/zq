@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/brimsec/zq/ast"
 	"github.com/brimsec/zq/compiler"
 	"github.com/brimsec/zq/driver"
 	"github.com/brimsec/zq/zio"
@@ -127,7 +128,8 @@ func (s *logTailerTSuite) read() (<-chan string, <-chan error) {
 	buf := bytes.NewBuffer(nil)
 	w := tzngio.NewWriter(zio.NopCloser(buf))
 	go func() {
-		err := driver.Copy(context.Background(), w, sortTs, s.zctx, s.dr, driver.Config{})
+		program := &ast.Program{Entry: sortTs}
+		err := driver.Copy(context.Background(), w, program, s.zctx, s.dr, driver.Config{})
 		if err != nil {
 			close(result)
 			errCh <- err

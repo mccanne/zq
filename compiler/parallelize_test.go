@@ -116,12 +116,12 @@ func TestParallelizeFlowgraph(t *testing.T) {
 			query, err := ParseProc(tc.zql)
 			require.NoError(t, err)
 
-			ok := IsParallelizable(query.(*ast.SequentialProc), sf(tc.orderField), false)
+			ok := isParallelizable(query.(*ast.SequentialProc), sf(tc.orderField), false)
 			require.Equal(t, ok, tc.zql != tc.expected)
 
 			seq, err := SemanticTransform(query.(*ast.SequentialProc))
 			require.NoError(t, err)
-			parallelized, ok := Parallelize(seq, 2, sf(tc.orderField), false)
+			parallelized, ok := parallelize(seq, 2, sf(tc.orderField), false)
 			require.Equal(t, ok, tc.zql != tc.expected)
 
 			expectedProc, err := ParseProc(tc.expected)
@@ -154,7 +154,7 @@ func TestParallelizeFlowgraph(t *testing.T) {
 		dquery := "split (=>filter * | cut ts, y, z | put x=y | rename y=z =>filter * | cut ts, y, z | put x=y | rename y=z)"
 		program, err := ParseProc(query)
 		require.NoError(t, err)
-		parallelized, ok := Parallelize(program.(*ast.SequentialProc), 2, sf(orderField), false)
+		parallelized, ok := parallelize(program.(*ast.SequentialProc), 2, sf(orderField), false)
 		require.True(t, ok)
 
 		expected, err := ParseProc(dquery)

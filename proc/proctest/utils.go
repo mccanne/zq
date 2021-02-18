@@ -59,18 +59,20 @@ func CompileTestProc(code string, pctx *proc.Context, parent proc.Interface) (pr
 	if len(sp.Procs) != 2 {
 		return nil, errors.New("expected 2 procs")
 	}
-	return CompileTestProcAST(sp.Procs[1], pctx, parent)
+	program := &ast.Program{Entry: sp.Procs[1]}
+	return CompileTestProcAST(program, pctx, parent)
 }
 
-func CompileTestProcAST(node ast.Proc, pctx *proc.Context, parent proc.Interface) (proc.Interface, error) {
-	procs, err := compiler.Compile(nil, node, pctx, nil, []proc.Interface{parent})
-	if err != nil {
+func CompileTestProcAST(p *ast.Program, pctx *proc.Context, parent proc.Interface) (proc.Interface, error) {
+	program := compiler.NewProgram(p, pctx)
+	if err := program.Compile(nil, []proc.Interface{parent}); err != nil {
 		return nil, err
 	}
-	if len(procs) != 1 {
-		return nil, errors.New("expected 1 proc")
+	outputs := program.Outputs()
+	if len(outputs) != 1 {
+		return nil, errors.New("expected 1 output proc")
 	}
-	return procs[0], nil
+	return outputs[0], nil
 }
 
 // TestSource implements the Proc interface but outputs a fixed set of

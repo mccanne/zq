@@ -84,9 +84,10 @@ func (s *SearchOp) Run(ctx context.Context, store storage.Storage, output Output
 	defer statsTicker.Stop()
 	zctx := resolver.NewContext()
 
+	program := &ast.Program{Entry: s.query.Proc}
 	switch st := store.(type) {
 	case *archivestore.Storage:
-		return driver.MultiRun(ctx, d, s.query.Proc, zctx, st.MultiSource(), driver.MultiConfig{
+		return driver.MultiRun(ctx, d, program, zctx, st.MultiSource(), driver.MultiConfig{
 			Logger:    s.logger,
 			Order:     zbuf.OrderDesc,
 			Span:      s.query.Span,
@@ -99,7 +100,7 @@ func (s *SearchOp) Run(ctx context.Context, store storage.Storage, output Output
 		}
 		defer rc.Close()
 
-		return driver.Run(ctx, d, s.query.Proc, zctx, rc, driver.Config{
+		return driver.Run(ctx, d, program, zctx, rc, driver.Config{
 			Logger:            s.logger,
 			ReaderSortKey:     "ts",
 			ReaderSortReverse: true,
@@ -128,10 +129,10 @@ func (s *SearchOp) RunDistributed(ctx context.Context, store storage.Storage, ou
 	statsTicker := time.NewTicker(StatsInterval)
 	defer statsTicker.Stop()
 	zctx := resolver.NewContext()
-
+	program := &ast.Program{Entry: s.query.Proc}
 	switch st := store.(type) {
 	case *archivestore.Storage:
-		return driver.MultiRun(ctx, d, s.query.Proc, zctx, st.MultiSource(), driver.MultiConfig{
+		return driver.MultiRun(ctx, d, program, zctx, st.MultiSource(), driver.MultiConfig{
 			Distributed: true,
 			Logger:      logger,
 			Order:       zbuf.OrderDesc,

@@ -2,41 +2,42 @@ package compiler
 
 import (
 	"github.com/brimsec/zq/ast"
-	"github.com/brimsec/zq/pkg/joe"
 	"github.com/brimsec/zq/zql"
-	"github.com/mitchellh/mapstructure"
 )
 
 // ParseProc() is an entry point for use from external go code,
 // mostly just a wrapper around Parse() that casts the return value.
-func ParseProc(query string, opts ...zql.Option) (ast.Proc, error) {
-	parsed, err := zql.Parse("", []byte(query), opts...)
+//func ParseProc(query string, opts ...zql.Option) (ast.Proc, error) {
+func ParseProc(query string) (ast.Proc, error) {
+	parsed, err := zql.Parse("", []byte(query), zql.Entrypoint("start"))
 	if err != nil {
 		return nil, err
 	}
-	return ast.UnpackMap(nil, parsed)
+	return ast.UnpackProc(nil, parsed)
 }
 
 func ParseExpression(expr string) (ast.Expression, error) {
-	m, err := zql.Parse("", []byte(expr), zql.Entrypoint("Expr"))
+	parsed, err := zql.Parse("", []byte(expr), zql.Entrypoint("Expr"))
 	if err != nil {
 		return nil, err
 	}
-	node := joe.Convert(m)
-	ex, err := ast.UnpackExpression(node)
+	return ast.UnpackExpression(nil, parsed)
+}
+
+func ParseProgram(z string) (*ast.Program, error) {
+	parsed, err := zql.Parse("", []byte(z), zql.Entrypoint("Program"))
 	if err != nil {
-		return nil, err
+		proc, nerr := ParseProc(z)
+		if nerr != nil {
+			return nil, err
+		}
+		return &ast.Program{Entry: proc}, nil
 	}
-	c := &mapstructure.DecoderConfig{
-		TagName: "json",
-		Result:  ex,
-		Squash:  true,
-	}
-	dec, err := mapstructure.NewDecoder(c)
-	if err != nil {
-		return nil, err
-	}
-	return ex, dec.Decode(m)
+	return ast.UnpackProgram(nil, parsed)
+}
+
+func ParseToObject(expr, entry string) (interface{}, error) {
+	return zql.Parse("", []byte(expr), zql.Entrypoint(entry))
 }
 
 // MustParseProc is functionally the same as ParseProc but panics if an error
@@ -47,4 +48,15 @@ func MustParseProc(query string) ast.Proc {
 		panic(err)
 	}
 	return proc
+}
+
+func MustParseProgram(query string) *ast.Program {
+	p, err := ParseProgram(query)
+	if err != nil {
+		if proc, err := ParseProc(query); err == nil {
+			return &ast.Program{Entry: proc}
+		}
+		panic(err)
+	}
+	return p
 }

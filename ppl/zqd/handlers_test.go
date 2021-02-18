@@ -873,7 +873,7 @@ func tzngCopy(t *testing.T, prog string, in string, outFormat string) string {
 	buf := bytes.NewBuffer(nil)
 	w, err := detector.LookupWriter(zio.NopCloser(buf), zctx, zio.WriterOpts{Format: outFormat})
 	require.NoError(t, err)
-	p := compiler.MustParseProc(prog)
+	p := compiler.MustParseProgram(prog)
 	err = driver.Copy(context.Background(), w, p, zctx, r, driver.Config{})
 	require.NoError(t, err)
 	return buf.String()

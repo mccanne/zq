@@ -380,7 +380,8 @@ func TestGroupbyUnit(t *testing.T) {
 			astProc.InputSortDir = dir
 			tctx := proctest.NewTestContext(resolver)
 			src := proctest.NewTestSource(inBatches)
-			gproc, err := proctest.CompileTestProcAST(astProc, tctx, src)
+			program := &ast.Program{Entry: astProc}
+			gproc, err := proctest.CompileTestProcAST(program, tctx, src)
 			assert.NoError(t, err)
 			procTest := proctest.NewProcTest(gproc, tctx)
 
@@ -485,7 +486,7 @@ func TestGroupbyStreamingSpill(t *testing.T) {
 	}
 
 	runOne := func(inputSortKey string) []string {
-		proc, err := compiler.ParseProc("every 1s count() by ip")
+		proc, err := compiler.ParseProgram("every 1s count() by ip")
 		assert.NoError(t, err)
 
 		zctx := resolver.NewContext()

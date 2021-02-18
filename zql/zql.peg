@@ -47,14 +47,25 @@
 #define PRINT(...) console.log(__VAR_ARGS__)
 #endif
 
-start = __ ast:Z __ EOF { RETURN(ast) }
+start = __ ast:Sequential __ EOF { RETURN(ast) }
 
-// A Z script can be either a single operation or a chain of operations.
-// For a single operation, we do not need to wrap operator in a SequentialProc,
-// but we do for everything but FilterProc because the zq runtime is fragile
-// to this difference right now.  See issue #1809.
-Z // = !(Operator / Aggregation / "(") op:Operation &EOF { RETURN(op) }
-  = Sequential
+Program
+  = __ consts:Const+ _ seq:Sequential __ EOF {
+      RETURN(MAP("op":"Program","consts": consts, "entry": seq))
+    }
+  / __ seq:Sequential __ EOF {
+      RETURN(MAP("op":"Program", "consts": NULL, "entry": seq))
+    }
+
+Const = __ v:AnyConst { RETURN(v) }
+
+AnyConst
+  = "const" _ id:IdentifierName __ "=" __ literal:Literal ( __ ";" / EOL ) {
+      RETURN(MAP("op":"const","name":id, "type":literal))
+    }
+  / "type" _ id:IdentifierName __ "=" __ typ:StringLiteral ( __ ";" / EOL ) {
+      RETURN(MAP("op":"typeconst","name":id, "type":typ))
+    }
 
 Sequential
   = first:Operation rest:SequentialTail+ {
@@ -902,5 +913,6 @@ MultiLineComment
 SingleLineComment
   = "//" (!LineTerminator SourceCharacter)*
 
+EOL = WhiteSpace* LineTerminator
 EOT = _ / EOF
 EOF = !.

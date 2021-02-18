@@ -47,7 +47,7 @@ func newEmitter(ofmt string) (*emitter.Bytes, error) {
 }
 
 func (i *Internal) Run() (string, error) {
-	program, err := compiler.ParseProc(i.Query)
+	program, err := compiler.ParseProgram(i.Query)
 	if err != nil {
 		return "", fmt.Errorf("parse error: %s (%s)", err, i.Query)
 	}

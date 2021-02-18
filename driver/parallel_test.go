@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/brimsec/zq/api"
+	"github.com/brimsec/zq/ast"
 	"github.com/brimsec/zq/compiler"
 	"github.com/brimsec/zq/field"
 	"github.com/brimsec/zq/pkg/nano"
@@ -118,11 +119,12 @@ func TestParallelOrder(t *testing.T) {
 	// Use `v!=3` to trigger & verify empty rank handling in orderedWaiter.
 	query, err := compiler.ParseProc("v!=3")
 	require.NoError(t, err)
+	program := &ast.Program{Entry: query}
 
 	var buf bytes.Buffer
 	d := NewCLI(tzngio.NewWriter(zio.NopCloser(&buf)))
 	zctx := resolver.NewContext()
-	err = MultiRun(context.Background(), d, query, zctx, &orderedmsrc{}, MultiConfig{
+	err = MultiRun(context.Background(), d, program, zctx, &orderedmsrc{}, MultiConfig{
 		Parallelism: len(parallelTestInputs),
 	})
 	require.NoError(t, err)
@@ -187,6 +189,7 @@ func (m *scannerCloseMS) SourceFromRequest(context.Context, *api.WorkerChunkRequ
 func TestScannerClose(t *testing.T) {
 	query, err := compiler.ParseProc("* | head 1")
 	require.NoError(t, err)
+	program := &ast.Program{Entry: query}
 
 	var buf bytes.Buffer
 	d := NewCLI(tzngio.NewWriter(zio.NopCloser(&buf)))
@@ -198,7 +201,7 @@ func TestScannerClose(t *testing.T) {
 `,
 		closed: make(chan struct{}),
 	}
-	err = MultiRun(context.Background(), d, query, zctx, ms, MultiConfig{})
+	err = MultiRun(context.Background(), d, program, zctx, ms, MultiConfig{})
 	require.NoError(t, err)
 	require.Equal(t, trim(ms.input), trim(buf.String()))
 

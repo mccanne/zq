@@ -46,18 +46,27 @@ func (n *namedScanner) Pull() (zbuf.Batch, error) {
 	return b, err
 }
 
-func compile(ctx context.Context, program ast.Proc, zctx *resolver.Context, readers []zbuf.Reader, cfg Config) (*muxOutput, error) {
+func compile(ctx context.Context, p *ast.Program, zctx *resolver.Context, readers []zbuf.Reader, cfg Config) (*muxOutput, error) {
 	if cfg.Logger == nil {
 		cfg.Logger = zap.NewNop()
 	}
 	if cfg.Span.Dur == 0 {
 		cfg.Span = nano.MaxSpan
 	}
-	filterExpr, program := compiler.Optimize(zctx, program, field.Dotted(cfg.ReaderSortKey), cfg.ReaderSortReverse)
+	pctx := &proc.Context{
+		Context:     ctx,
+		TypeContext: zctx,
+		Logger:      cfg.Logger,
+		Warnings:    make(chan string, 5),
+	}
+	program := compiler.NewProgram(p, pctx)
+	if err := program.Optimize(field.Dotted(cfg.ReaderSortKey), cfg.ReaderSortReverse); err != nil {
+		return nil, err
+	}
 	procs := make([]proc.Interface, 0, len(readers))
 	scanners := make([]zbuf.Scanner, 0, len(readers))
 	for _, r := range readers {
-		sn, err := zbuf.NewScanner(ctx, r, filterExpr, cfg.Span)
+		sn, err := zbuf.NewScanner(ctx, r, program.Filter(), cfg.Span)
 		if err != nil {
 			return nil, err
 		}
@@ -68,17 +77,10 @@ func compile(ctx context.Context, program ast.Proc, zctx *resolver.Context, read
 		procs = append(procs, &scannerProc{sn})
 	}
 
-	pctx := &proc.Context{
-		Context:     ctx,
-		TypeContext: zctx,
-		Logger:      cfg.Logger,
-		Warnings:    make(chan string, 5),
-	}
-	leaves, err := compiler.Compile(cfg.Custom, program, pctx, nil, procs)
-	if err != nil {
+	if err := program.Compile(cfg.Custom, procs); err != nil {
 		return nil, err
 	}
-	return newMuxOutput(pctx, leaves, zbuf.MultiStats(scanners)), nil
+	return newMuxOutput(pctx, program.Outputs(), zbuf.MultiStats(scanners)), nil
 }
 
 type MultiConfig struct {
@@ -92,7 +94,7 @@ type MultiConfig struct {
 	Worker      worker.WorkerConfig
 }
 
-func compileMulti(ctx context.Context, program ast.Proc, zctx *resolver.Context, msrc MultiSource, mcfg MultiConfig) (*muxOutput, error) {
+func compileMulti(ctx context.Context, p *ast.Program, zctx *resolver.Context, msrc MultiSource, mcfg MultiConfig) (*muxOutput, error) {
 	if mcfg.Logger == nil {
 		mcfg.Logger = zap.NewNop()
 	}
@@ -104,27 +106,28 @@ func compileMulti(ctx context.Context, program ast.Proc, zctx *resolver.Context,
 	}
 
 	sortKey, sortReversed := msrc.OrderInfo()
-	filterExpr, program := compiler.Optimize(zctx, program, sortKey, sortReversed)
-
-	if !compiler.IsParallelizable(program, sortKey, sortReversed) {
-		mcfg.Parallelism = 1
-	}
 	pctx := &proc.Context{
 		Context:     ctx,
 		TypeContext: zctx,
 		Logger:      mcfg.Logger,
 		Warnings:    make(chan string, 5),
 	}
-	sources, pgroup, err := createParallelGroup(pctx, filterExpr, msrc, mcfg)
+	program := compiler.NewProgram(p, pctx)
+	if err := program.Optimize(sortKey, sortReversed); err != nil {
+		return nil, err
+	}
+	if !program.IsParallelizable(sortKey, sortReversed) {
+		mcfg.Parallelism = 1
+	}
+	sources, pgroup, err := createParallelGroup(pctx, program.Filter(), msrc, mcfg)
 	if err != nil {
 		return nil, err
 	}
 	if len(sources) > 1 {
-		program, _ = compiler.Parallelize(program, len(sources), sortKey, sortReversed)
+		program.Parallelize(len(sources), sortKey, sortReversed)
 	}
-	leaves, err := compiler.Compile(mcfg.Custom, program, pctx, nil, sources)
-	if err != nil {
+	if err := program.Compile(mcfg.Custom, sources); err != nil {
 		return nil, err
 	}
-	return newMuxOutput(pctx, leaves, pgroup), nil
+	return newMuxOutput(pctx, program.Outputs(), pgroup), nil
 }

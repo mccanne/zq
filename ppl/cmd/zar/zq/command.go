@@ -70,7 +70,7 @@ func (c *Command) Run(args []string) error {
 		return err
 	}
 
-	query, err := compiler.ParseProc(args[0])
+	query, err := compiler.ParseProgram(args[0])
 	if err != nil {
 		return err
 	}

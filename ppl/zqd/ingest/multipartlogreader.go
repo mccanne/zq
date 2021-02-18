@@ -115,7 +115,8 @@ next:
 		goto next
 	}
 	if m.shaperAST != nil {
-		zr, err = driver.NewReader(context.Background(), m.shaperAST, m.zctx, zr)
+		program := &ast.Program{Entry: m.shaperAST}
+		zr, err = driver.NewReader(context.Background(), program, m.zctx, zr)
 		if err != nil {
 			return nil, err
 		}

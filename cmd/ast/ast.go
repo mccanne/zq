@@ -6,12 +6,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os/exec"
 	"strings"
 
 	"github.com/brimsec/zq/compiler"
-	"github.com/brimsec/zq/zql"
 	"github.com/mccanne/charm"
 	"github.com/peterh/liner"
 )
@@ -46,6 +46,8 @@ type Command struct {
 	ast    bool
 	all    bool
 	n      int
+	entry  string
+	file   string
 }
 
 func New(f *flag.FlagSet) (charm.Command, error) {
@@ -55,11 +57,13 @@ func New(f *flag.FlagSet) (charm.Command, error) {
 	f.BoolVar(&c.pigeon, "pigeon", true, "run pigeon version of peg parser")
 	f.BoolVar(&c.ast, "ast", false, "run pigeon version of peg parser and show marshaled ast")
 	f.BoolVar(&c.all, "all", false, "run all and show variants")
+	f.StringVar(&c.entry, "e", "Program", "entry point to parser (Program|start|Expr)")
+	f.StringVar(&c.file, "x", "", "get Z from file instead of command line")
 	return c, nil
 }
 
 func (c *Command) Run(args []string) error {
-	if len(args) == 0 {
+	if len(args) == 0 && c.file == "" {
 		return Ast.Exec(c, []string{"help"})
 	}
 	if c.all {
@@ -81,7 +85,15 @@ func (c *Command) Run(args []string) error {
 		c.interactive()
 		return nil
 	}
-	return c.parse(strings.Join(args, " "))
+	z := strings.Join(args, " ")
+	if c.file != "" {
+		b, err := ioutil.ReadFile(c.file)
+		if err != nil {
+			return err
+		}
+		z = string(b)
+	}
+	return c.parse(z)
 }
 
 func (c *Command) parse(z string) error {
@@ -96,7 +108,7 @@ func (c *Command) parse(z string) error {
 		fmt.Println(s)
 	}
 	if c.pigeon {
-		s, err := parsePigeon(z)
+		s, err := parsePigeon(z, c.entry)
 		if err != nil {
 			return err
 		}
@@ -106,7 +118,7 @@ func (c *Command) parse(z string) error {
 		fmt.Println(s)
 	}
 	if c.ast {
-		s, err := parseProc(z)
+		s, err := parseProc(z, c.entry)
 		if err != nil {
 			return err
 		}
@@ -170,20 +182,40 @@ func parsePEGjs(z string) (string, error) {
 	return normalize(b)
 }
 
-func parseProc(z string) (string, error) {
-	proc, err := compiler.ParseProc(z)
-	if err != nil {
-		return "", err
+func parseProc(z, entry string) (string, error) {
+	var procJSON []byte
+	var err error
+	switch entry {
+	case "start":
+		proc, perr := compiler.ParseProc(z)
+		if perr != nil {
+			return "", perr
+		}
+		procJSON, err = json.Marshal(proc)
+	case "Program":
+		proc, perr := compiler.ParseProgram(z)
+		if perr != nil {
+			return "", perr
+		}
+		procJSON, err = json.Marshal(proc)
+
+	case "Expr":
+		proc, perr := compiler.ParseExpression(z)
+		if perr != nil {
+			return "", perr
+		}
+		procJSON, err = json.Marshal(proc)
+	default:
+		return "", fmt.Errorf("ast: unknown grammar entry: %s", entry)
 	}
-	procJSON, err := json.Marshal(proc)
 	if err != nil {
 		return "", err
 	}
 	return normalize(procJSON)
 }
 
-func parsePigeon(z string) (string, error) {
-	ast, err := zql.Parse("", []byte(z))
+func parsePigeon(z, entry string) (string, error) {
+	ast, err := compiler.ParseToObject(z, entry)
 	if err != nil {
 		return "", err
 	}

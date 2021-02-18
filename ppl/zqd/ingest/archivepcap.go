@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/brimsec/zq/api"
+	"github.com/brimsec/zq/ast"
 	"github.com/brimsec/zq/driver"
 	"github.com/brimsec/zq/pkg/ctxio"
 	"github.com/brimsec/zq/pkg/iosrc"
@@ -138,7 +139,8 @@ func (p *archivePcapOp) runAnalyzers(ctx context.Context, group *errgroup.Group,
 		}
 		pipes = append(pipes, pw)
 		// Suricata logs need flowgraph to rename timestamp fields into ts.
-		tr, err := driver.NewReader(ctx, suricataTransform, p.zctx, dr)
+		program := &ast.Program{Entry: suricataTransform}
+		tr, err := driver.NewReader(ctx, program, p.zctx, dr)
 		if err != nil {
 			return nil, err
 		}

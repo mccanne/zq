@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/brimsec/zq/api"
+	"github.com/brimsec/zq/ast"
 	"github.com/brimsec/zq/compiler"
 	"github.com/brimsec/zq/driver"
 	"github.com/brimsec/zq/pkg/fs"
@@ -326,7 +327,8 @@ func (p *legacyPcapOp) convertSuricataLog(ctx context.Context) error {
 	defer zr.Close()
 	return fs.ReplaceFile(filepath.Join(p.logdir, "eve.zng"), os.FileMode(0666), func(w io.Writer) error {
 		zw := zngio.NewWriter(zio.NopCloser(w), zngio.WriterOpts{})
-		return driver.Copy(ctx, zw, suricataTransform, zctx, zr, driver.Config{})
+		program := &ast.Program{Entry: suricataTransform}
+		return driver.Copy(ctx, zw, program, zctx, zr, driver.Config{})
 	})
 }
 

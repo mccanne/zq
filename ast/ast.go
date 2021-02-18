@@ -15,6 +15,27 @@ import (
 	"github.com/brimsec/zq/field"
 )
 
+type Program struct {
+	Op     string      `json:"op"`
+	Consts []Const     `json:"consts"`
+	Types  []TypeConst `json:"types"`
+	Entry  Proc        `json:"entry"`
+}
+
+type Const struct {
+	Op    string  `json:"op"`
+	Name  string  `json:"name"`
+	Value Literal `json:"value"`
+}
+
+type TypeConst struct {
+	Op   string `json:"op"`
+	Name string `json:"name"`
+	// For now types are strings of their ZSON type.  When we add
+	// type parsing to the grammar, this will change to Type.
+	Type string `json:"type"`
+}
+
 // Proc is the interface implemented by all AST processor nodes.
 type Proc interface {
 	ProcNode()
@@ -435,6 +456,10 @@ func FanIn(p Proc) int {
 		return 2
 	}
 	return 1
+}
+
+func (p *Program) FanIn() int {
+	return FanIn(p.Entry)
 }
 
 func FilterToProc(e Expression) *FilterProc {

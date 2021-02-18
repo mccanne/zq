@@ -71,7 +71,7 @@ func (c *Command) Run(args []string) error {
 	if len(args) == 0 {
 		return errors.New("zar map needs input arguments")
 	}
-	query, err := compiler.ParseProc(args[0])
+	query, err := compiler.ParseProgram(args[0])
 	if err != nil {
 		return err
 	}

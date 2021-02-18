@@ -135,7 +135,7 @@ func (c *Command) Run(args []string) error {
 		zqlSrc = paths[0]
 		paths = paths[1:]
 	}
-	query, err := compiler.ParseProc(zqlSrc)
+	query, err := compiler.ParseProgram(zqlSrc)
 	if err != nil {
 		return fmt.Errorf("parse error: %s", err)
 	}

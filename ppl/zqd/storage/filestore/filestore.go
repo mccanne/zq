@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/brimsec/zq/api"
+	"github.com/brimsec/zq/ast"
 	"github.com/brimsec/zq/compiler"
 	"github.com/brimsec/zq/driver"
 	"github.com/brimsec/zq/pkg/bufwriter"
@@ -35,7 +36,9 @@ const (
 var (
 	ErrWriteInProgress = errors.New("another write is already in progress")
 
-	zngWriteProc = compiler.MustParseProc("sort -r ts")
+	zngWriteProc = &ast.Program{
+		Entry: compiler.MustParseProc("sort -r ts"),
+	}
 )
 
 func Load(path iosrc.URI, logger *zap.Logger) (*Storage, error) {

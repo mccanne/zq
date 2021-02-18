@@ -261,7 +261,7 @@ func enteringJoin(nodes []ast.Proc) bool {
 
 func compileSequential(custom Hook, nodes []ast.Proc, pctx *proc.Context, scope *Scope, parents []proc.Interface) ([]proc.Interface, error) {
 	node := nodes[0]
-	parents, err := Compile(custom, node, pctx, scope, parents)
+	parents, err := compile(custom, node, pctx, scope, parents)
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +301,7 @@ func compileParallel(custom Hook, pp *ast.ParallelProc, c *proc.Context, scope *
 	}
 	var procs []proc.Interface
 	for k := 0; k < n; k++ {
-		proc, err := Compile(custom, pp.Procs[k], c, scope, []proc.Interface{parents[k]})
+		proc, err := compile(custom, pp.Procs[k], c, scope, []proc.Interface{parents[k]})
 		if err != nil {
 			return nil, err
 		}
@@ -310,10 +310,10 @@ func compileParallel(custom Hook, pp *ast.ParallelProc, c *proc.Context, scope *
 	return procs, nil
 }
 
-// Compile compiles an AST into a graph of Procs, and returns
+// compile compiles an AST into a graph of Procs, and returns
 // the leaves.  A custom compiler hook can be included and it will be tried first
 // for each node encountered during the compilation.
-func Compile(custom Hook, node ast.Proc, pctx *proc.Context, scope *Scope, parents []proc.Interface) ([]proc.Interface, error) {
+func compile(custom Hook, node ast.Proc, pctx *proc.Context, scope *Scope, parents []proc.Interface) ([]proc.Interface, error) {
 	if len(parents) == 0 {
 		return nil, errors.New("no parents")
 	}

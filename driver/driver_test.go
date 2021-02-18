@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/brimsec/zq/ast"
 	"github.com/brimsec/zq/compiler"
 	"github.com/brimsec/zq/zbuf"
 	"github.com/brimsec/zq/zio/tzngio"
@@ -29,6 +30,7 @@ func TestMuxDriver(t *testing.T) {
 
 	query, err := compiler.ParseProc("split (=>tail 1 =>tail 1)")
 	assert.NoError(t, err)
+	program := &ast.Program{Entry: query}
 
 	t.Run("muxed into one writer", func(t *testing.T) {
 		zctx := resolver.NewContext()
@@ -36,7 +38,7 @@ func TestMuxDriver(t *testing.T) {
 		assert.NoError(t, err)
 		c := counter{}
 		d := NewCLI(&c)
-		err = Run(context.Background(), d, query, zctx, reader, Config{})
+		err = Run(context.Background(), d, program, zctx, reader, Config{})
 		assert.NoError(t, err)
 		assert.Equal(t, 2, c.n)
 	})
@@ -47,7 +49,7 @@ func TestMuxDriver(t *testing.T) {
 		assert.NoError(t, err)
 		cs := []zbuf.Writer{&counter{}, &counter{}}
 		d := NewCLI(cs...)
-		err = Run(context.Background(), d, query, zctx, reader, Config{})
+		err = Run(context.Background(), d, program, zctx, reader, Config{})
 		assert.NoError(t, err)
 		assert.Equal(t, 1, cs[0].(*counter).n)
 		assert.Equal(t, 1, cs[1].(*counter).n)

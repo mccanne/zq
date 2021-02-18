@@ -47,7 +47,7 @@ func doZqlFileEval(inquery, inpath, informat, outpath, outformat string) (err er
 	if outpath == "-" {
 		outpath = "/dev/stdout"
 	}
-	query, err := compiler.ParseProc(inquery)
+	query, err := compiler.ParseProgram(inquery)
 	if err != nil {
 		return err
 	}

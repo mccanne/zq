@@ -131,7 +131,7 @@ func TestCompare(t *testing.T) {
 			runtest(t, desc, "==", c.value, c.eql)
 		}
 	})
-	r, err := driver.NewReader(context.Background(), compiler.MustParseProc("sort ts"), resolver.NewContext(), reader(records))
+	r, err := driver.NewReader(context.Background(), compiler.MustParseProgram("sort ts"), resolver.NewContext(), reader(records))
 	require.NoError(t, err)
 	asc := buildAndOpen(t, r, microindex.Keys("ts"), microindex.Order(zbuf.OrderAsc))
 	t.Run("Ascending", func(t *testing.T) {

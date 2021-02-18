@@ -624,7 +624,7 @@ func runzq(path, ZQL string, outputFlags []string, inputs ...string) (string, st
 		// tests.
 		return outbuf.String(), errbuf.String(), err
 	}
-	proc, err := compiler.ParseProc(ZQL)
+	proc, err := compiler.ParseProgram(ZQL)
 	if err != nil {
 		return "", "", err
 	}

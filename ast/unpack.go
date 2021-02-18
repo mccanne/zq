@@ -13,6 +13,26 @@ type Unpacker interface {
 	Unpack(string, joe.Interface) (Proc, error)
 }
 
+func unpackProgram(node joe.Interface) (*Program, error) {
+	op, err := getString(node, "op")
+	if err != nil {
+		return nil, err
+	}
+	if op != "Program" {
+		return nil, errors.New("ast.unpackProgram: op not 'Program'")
+	}
+	entry, err := node.Get("entry")
+	if err != nil {
+		return nil, errors.New("ast.unpackProgram: entry field is missing")
+	}
+	program := &Program{}
+	program.Entry, err = unpackProc(nil, entry)
+	if err != nil {
+		return nil, err
+	}
+	return program, nil
+}
+
 func unpackProcs(custom Unpacker, node joe.Interface) ([]Proc, error) {
 	if node == nil {
 		return nil, errors.New("ast.unpackProcs: procs field is missing")
@@ -116,7 +136,7 @@ func unpackProc(custom Unpacker, node joe.Interface) (Proc, error) {
 		if err != nil {
 			return nil, errors.New("ast filter proc: missing filter field")
 		}
-		filter, err := UnpackExpression(f)
+		filter, err := unpackExpression(f)
 		if err != nil {
 			return nil, err
 		}
@@ -177,7 +197,7 @@ func unpackProc(custom Unpacker, node joe.Interface) (Proc, error) {
 		if err != nil {
 			return nil, errors.New("ast join proc: missing left_key field")
 		}
-		leftKey, err := UnpackExpression(n)
+		leftKey, err := unpackExpression(n)
 		if err != nil {
 			return nil, err
 		}
@@ -185,7 +205,7 @@ func unpackProc(custom Unpacker, node joe.Interface) (Proc, error) {
 		if err != nil {
 			return nil, errors.New("ast join proc: missing right_key field")
 		}
-		rightKey, err := UnpackExpression(n)
+		rightKey, err := unpackExpression(n)
 		if err != nil {
 			return nil, err
 		}
@@ -205,7 +225,7 @@ func unpackExprs(node joe.Interface) ([]Expression, error) {
 	}
 	exprs := make([]Expression, 0, len(a))
 	for _, item := range a {
-		e, err := UnpackExpression(item)
+		e, err := unpackExpression(item)
 		if err != nil {
 			return nil, err
 		}
@@ -222,7 +242,7 @@ func unpackAssignment(node joe.Interface) (Assignment, error) {
 	lhsNode, err := node.Get("lhs")
 	// LHS is optional as compiler will infer a field name from the LHS.
 	if err == nil && lhsNode != nil {
-		lhs, err = UnpackExpression(lhsNode)
+		lhs, err = unpackExpression(lhsNode)
 		if err != nil {
 			return Assignment{}, err
 		}
@@ -231,7 +251,7 @@ func unpackAssignment(node joe.Interface) (Assignment, error) {
 	if err != nil {
 		return Assignment{}, errors.New("ast.unpackAssignment: missing rhs field")
 	}
-	rhs, err := UnpackExpression(rhsNode)
+	rhs, err := unpackExpression(rhsNode)
 	if err != nil {
 		return Assignment{}, err
 	}
@@ -257,9 +277,9 @@ func unpackAssignments(node joe.Interface) ([]Assignment, error) {
 	return fas, nil
 }
 
-func UnpackExpression(node joe.Interface) (Expression, error) {
+func unpackExpression(node joe.Interface) (Expression, error) {
 	if node == nil {
-		return nil, errors.New("ast.UnpackExpression: no expression provided")
+		return nil, errors.New("ast.unpackExpression: no expression provided")
 	}
 	op, err := getString(node, "op")
 	if err != nil {
@@ -279,7 +299,7 @@ func UnpackExpression(node joe.Interface) (Expression, error) {
 		if err != nil {
 			return nil, errors.New("ConditionalExpr missing condition")
 		}
-		condition, err := UnpackExpression(conditionNode)
+		condition, err := unpackExpression(conditionNode)
 		if err != nil {
 			return nil, err
 		}
@@ -288,7 +308,7 @@ func UnpackExpression(node joe.Interface) (Expression, error) {
 		if err != nil {
 			return nil, errors.New("ConditionalExpr missing then")
 		}
-		thenClause, err := UnpackExpression(thenNode)
+		thenClause, err := unpackExpression(thenNode)
 		if err != nil {
 			return nil, err
 		}
@@ -297,7 +317,7 @@ func UnpackExpression(node joe.Interface) (Expression, error) {
 		if err != nil {
 			return nil, errors.New("ConditionalExpr missing else")
 		}
-		elseClause, err := UnpackExpression(elseNode)
+		elseClause, err := unpackExpression(elseNode)
 		if err != nil {
 			return nil, err
 		}
@@ -317,7 +337,7 @@ func UnpackExpression(node joe.Interface) (Expression, error) {
 		if err != nil {
 			return nil, errors.New("CastExpr missing expr")
 		}
-		expr, err := UnpackExpression(exprNode)
+		expr, err := unpackExpression(exprNode)
 		if err != nil {
 			return nil, err
 		}
@@ -326,12 +346,12 @@ func UnpackExpression(node joe.Interface) (Expression, error) {
 		exprNode, _ := node.Get("expr")
 		var expr Expression
 		if exprNode != nil {
-			expr, _ = UnpackExpression(exprNode)
+			expr, _ = unpackExpression(exprNode)
 		}
 		whereNode, _ := node.Get("where")
 		var where Expression
 		if whereNode != nil {
-			where, _ = UnpackExpression(whereNode)
+			where, _ = unpackExpression(whereNode)
 		}
 		return &Reducer{Expr: expr, Where: where}, nil
 	case "Literal":
@@ -343,7 +363,7 @@ func UnpackExpression(node joe.Interface) (Expression, error) {
 	case "Empty":
 		return &Empty{}, nil
 	default:
-		return nil, fmt.Errorf("ast.UnpackExpression: unknown op %s", op)
+		return nil, fmt.Errorf("ast.unpackExpression: unknown op %s", op)
 	}
 }
 
@@ -359,7 +379,7 @@ func unpackArgs(node joe.Interface) ([]Expression, error) {
 	args := make([]Expression, len(a))
 	for i := range args {
 		var err error
-		args[i], err = UnpackExpression(a[i])
+		args[i], err = unpackExpression(a[i])
 		if err != nil {
 			return nil, err
 		}
@@ -372,7 +392,7 @@ func unpackBinaryExpr(node joe.Interface) (*BinaryExpression, error) {
 	if err != nil {
 		return nil, errors.New("BinaryExpression missing lhs")
 	}
-	lhs, err := UnpackExpression(lhsNode)
+	lhs, err := unpackExpression(lhsNode)
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +400,7 @@ func unpackBinaryExpr(node joe.Interface) (*BinaryExpression, error) {
 	if err != nil {
 		return nil, errors.New("BinaryExpression missing rhs")
 	}
-	rhs, err := UnpackExpression(rhsNode)
+	rhs, err := unpackExpression(rhsNode)
 	if err != nil {
 		return nil, err
 	}
@@ -404,14 +424,14 @@ func unpackUnaryExpr(node joe.Interface) (*UnaryExpression, error) {
 	if err != nil {
 		return nil, errors.New("UnaryExpr missing operand")
 	}
-	operand, err := UnpackExpression(operandNode)
+	operand, err := unpackExpression(operandNode)
 	if err != nil {
 		return nil, err
 	}
 	return &UnaryExpression{Operand: operand}, nil
 }
 
-func UnpackMap(custom Unpacker, m interface{}) (Proc, error) {
+func UnpackProc(custom Unpacker, m interface{}) (Proc, error) {
 	obj := joe.Convert(m)
 	proc, err := unpackProc(custom, obj)
 	if err != nil {
@@ -427,6 +447,42 @@ func UnpackMap(custom Unpacker, m interface{}) (Proc, error) {
 		return nil, err
 	}
 	return proc, dec.Decode(m)
+}
+
+func UnpackExpression(custom Unpacker, m interface{}) (Expression, error) {
+	node := joe.Convert(m)
+	ex, err := unpackExpression(node)
+	if err != nil {
+		return nil, err
+	}
+	c := &mapstructure.DecoderConfig{
+		TagName: "json",
+		Result:  ex,
+		Squash:  true,
+	}
+	dec, err := mapstructure.NewDecoder(c)
+	if err != nil {
+		return nil, err
+	}
+	return ex, dec.Decode(m)
+}
+
+func UnpackProgram(custom Unpacker, m interface{}) (*Program, error) {
+	node := joe.Convert(m)
+	program, err := unpackProgram(node)
+	if err != nil {
+		return nil, err
+	}
+	c := &mapstructure.DecoderConfig{
+		TagName: "json",
+		Result:  program,
+		Squash:  true,
+	}
+	dec, err := mapstructure.NewDecoder(c)
+	if err != nil {
+		return nil, err
+	}
+	return program, dec.Decode(m)
 }
 
 // UnpackJSON transforms a JSON representation of a proc into an ast.Proc.
