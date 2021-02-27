@@ -1,0 +1,17 @@
+script: ast -C -P 2 -sortKey ts "* | every 1h count() by y"
+
+outputs:
+  - name: stdout
+    data: |
+      split (
+        =>
+          filter *
+          | summarize every 1h0m0s partials-out sort-dir 1
+              count=count() by ts=trunc(ts, 3600),y=y
+        =>
+          filter *
+          | summarize every 1h0m0s partials-out sort-dir 1
+              count=count() by ts=trunc(ts, 3600),y=y
+      ) merge-by ts
+      | summarize every 1h0m0s partials-in sort-dir 1
+          count=count() by ts=trunc(ts, 3600),y=y

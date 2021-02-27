@@ -89,11 +89,11 @@ func compileProc(custom Hook, node ast.Proc, pctx *proc.Context, scope *Scope, p
 		}
 		fields := make([]field.Static, 0, len(v.Fields))
 		for _, e := range v.Fields {
-			field, ok := ast.DotExprToField(e)
+			field, ok := e.(*ast.FieldPath)
 			if !ok {
 				return nil, errors.New("drop: arg not a field")
 			}
-			fields = append(fields, field)
+			fields = append(fields, field.Name)
 		}
 		dropper := expr.NewDropper(pctx.TypeContext, fields)
 		return proc.FromFunction(pctx, parent, dropper, "drop"), nil
@@ -157,13 +157,13 @@ func compileProc(custom Hook, node ast.Proc, pctx *proc.Context, scope *Scope, p
 	case *ast.RenameProc:
 		var srcs, dsts []field.Static
 		for _, fa := range v.Fields {
-			dst, err := CompileLval(fa.LHS)
+			dst, err := compileLval(fa.LHS)
 			if err != nil {
 				return nil, err
 			}
 			// We call CompileLval on the RHS because renames are
 			// restricted to dotted field name expressions.
-			src, err := CompileLval(fa.RHS)
+			src, err := compileLval(fa.RHS)
 			if err != nil {
 				return nil, err
 			}
@@ -325,21 +325,14 @@ func Compile(custom Hook, node ast.Proc, pctx *proc.Context, scope *Scope, paren
 		return nil, errors.New("no parents")
 	}
 	if scope == nil {
-		// Outermost caller should pass in global scope object.  If nil,
-		// we assume no global context and allocate a fresh, empty scope.
-		scope = newScope()
-		scope.Enter()
+		panic("no scope")
 	}
 	switch node := node.(type) {
 	case *ast.SequentialProc:
 		if len(node.Procs) == 0 {
 			return nil, errors.New("sequential proc without procs")
 		}
-		procs, err := compileConsts(pctx.TypeContext, scope, node.Procs)
-		if err != nil {
-			return nil, err
-		}
-		return compileSequential(custom, procs, pctx, scope, parents)
+		return compileSequential(custom, node.Procs, pctx, scope, parents)
 
 	case *ast.ParallelProc:
 		return compileParallel(custom, node, pctx, scope, parents)
@@ -393,17 +386,17 @@ func Compile(custom Hook, node ast.Proc, pctx *proc.Context, scope *Scope, paren
 	}
 }
 
-func compileConsts(zctx *resolver.Context, scope *Scope, procs []ast.Proc) ([]ast.Proc, error) {
-	for k, p := range procs {
+func LoadConsts(zctx *resolver.Context, scope *Scope, procs []ast.Proc) error {
+	for _, p := range procs {
 		switch p := p.(type) {
 		case *ast.ConstProc:
 			e, err := compileExpr(zctx, scope, p.Expr)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			typ, err := zctx.LookupTypeRecord([]zng.Column{})
 			if err != nil {
-				return nil, err
+				return err
 			}
 			rec := zng.NewRecord(typ, nil)
 			zv, err := e.Eval(rec)
@@ -411,7 +404,7 @@ func compileConsts(zctx *resolver.Context, scope *Scope, procs []ast.Proc) ([]as
 				if err == zng.ErrMissing {
 					err = fmt.Errorf("cannot resolve const '%s' at compile time", p.Name)
 				}
-				return nil, err
+				return err
 			}
 			scope.Bind(p.Name, &zv)
 
@@ -419,18 +412,18 @@ func compileConsts(zctx *resolver.Context, scope *Scope, procs []ast.Proc) ([]as
 			name := p.Name
 			typ, err := zson.TranslateType(zctx.Context, p.Type)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			alias, err := zctx.LookupTypeAlias(name, typ)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			zv := zng.NewTypeType(alias)
 			scope.Bind(name, &zv)
 
 		default:
-			return procs[k:], nil
+			return fmt.Errorf("kernel.LoadConsts: not a const: '%T'", p)
 		}
 	}
-	return nil, nil
+	return nil
 }

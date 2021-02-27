@@ -1,5 +1,5 @@
 script: |
-  ast -C 'foo | split (=> count() by x=.["@foo"] => sum(x) => put a=b*c ) | cut cake | sort -r x'
+  ast -s -C 'foo | split (=> count() by x=.["@foo"] => sum(x) => put a=b*c ) | cut cake | sort -r x'
 
 outputs:
   - name: stdout
@@ -8,12 +8,12 @@ outputs:
       | split (
         =>
           summarize
-              count() by x=.["@foo"]
+              count=count() by x=["@foo"]
         =>
           summarize
-              sum(x)
+              sum=sum(x)
         =>
           put a=b*c
       )
-      | cut cake
+      | cut cake=cake
       | sort -r x

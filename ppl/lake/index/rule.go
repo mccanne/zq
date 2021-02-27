@@ -128,9 +128,9 @@ var countAst = ast.NewReducerAssignment("count", nil, nil)
 func (r Rule) typeProc() (ast.Proc, error) {
 	return &ast.SequentialProc{
 		Procs: []ast.Proc{
-			&typeSplitterNode{
-				key:      keyName,
-				typeName: r.Type,
+			&ast.TypeSplitter{
+				Key:      keyName,
+				TypeName: r.Type,
 			},
 			&ast.GroupByProc{
 				Keys:     []ast.Assignment{keyAst},
@@ -144,9 +144,9 @@ func (r Rule) typeProc() (ast.Proc, error) {
 func (r Rule) fieldProc() (ast.Proc, error) {
 	return &ast.SequentialProc{
 		Procs: []ast.Proc{
-			&fieldCutterNode{
-				field: field.Dotted(r.Field),
-				out:   keyName,
+			&ast.FieldCutter{
+				Field: field.Dotted(r.Field),
+				Out:   keyName,
 			},
 			&ast.GroupByProc{
 				Keys:     []ast.Assignment{keyAst},

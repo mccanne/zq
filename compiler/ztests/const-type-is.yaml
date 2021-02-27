@@ -1,0 +1,10 @@
+zql: const t = {a:string} ; is(t)
+
+input: |
+  {a:"hello"}
+  {a:2}
+  {a:"world"}
+
+output: |
+  {a:"hello"}
+  {a:"world"}

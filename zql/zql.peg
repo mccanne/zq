@@ -157,24 +157,28 @@ SearchFactor
 ShortCut
   = "*" __ compareOp:EqualityToken __ v:SearchValue {
       RETURN(MAP("op": "FunctionCall", "function": "or",
-        "args": ARRAY(MAP("op": "BinaryExpr", "operator":"@",
-                 "lhs":MAP("op": "SelectExpr", "selectors": ARRAY(MAP("op": "RootRecord"))),
-                 "rhs":MAP("op": "FunctionCall", "function": "map",
-                   "args": ARRAY(MAP("op": "BinaryExpr", "operator": "=",
-                     "lhs": MAP("op": "Identifier", "name": "$"),
-                     "rhs": v)))))))
+        "args": ARRAY(
+          MAP("op": "SelectExpr",
+              "selectors": ARRAY(MAP("op": "RootRecord")),
+              "methods": ARRAY(
+                MAP("op": "FunctionCall", "function": "map",
+                    "args": ARRAY(MAP("op": "BinaryExpr", "operator": "=",
+                                      "lhs": MAP("op": "Identifier", "name": "$"),
+                                      "rhs": v))))))))
     }
   / f:Lval __ comp:EqualityToken __ v:GlobbySearchValue !ExprGuard {
       RETURN(MAP("op": "BinaryExpr", "operator":comp, "lhs":f, "rhs":v))
     }
   / v:SearchValue _ InToken _ "*" {
       RETURN(MAP("op": "FunctionCall", "function": "or",
-        "args": ARRAY(MAP("op": "BinaryExpr", "operator":"@",
-                 "lhs":MAP("op": "SelectExpr", "selectors": ARRAY(MAP("op": "RootRecord"))),
-                 "rhs":MAP("op": "FunctionCall", "function": "map",
-                   "args": ARRAY(MAP("op": "BinaryExpr", "operator": "in",
-                     "lhs": v,
-                     "rhs": MAP("op": "Identifier", "name": "$"))))))))
+        "args": ARRAY(
+          MAP("op": "SelectExpr",
+              "selectors": ARRAY(MAP("op": "RootRecord")),
+              "methods": ARRAY(
+                MAP("op": "FunctionCall", "function": "map",
+                    "args": ARRAY(MAP("op": "BinaryExpr", "operator": "in",
+                                      "rhs": MAP("op": "Identifier", "name": "$"),
+                                      "lhs": v))))))))
     }
   / !(SearchGuard EOT) v:GlobbySearchValue !ExprGuard {
       RETURN(MAP("op": "Search", "text": TEXT, "value": v))
@@ -615,9 +619,20 @@ MatchExpr
   = "match" __ "(" expr:SearchBoolean ")" { RETURN(expr) }
 
 SelectExpr
-  = "select" __ "(" __ args:ArgumentList __ ")" methods:(__ "." __ e:Function { RETURN(ARRAY("@", e)) })* {
-      RETURN(makeBinaryExprChain(MAP("op":"SelectExpr", "selectors":args), methods))
+  = "select" __ "(" __ args:ArgumentList __ ")" methods:Methods {
+      RETURN(MAP("op":"SelectExpr", "selectors":args, "methods": methods))
     }
+
+// Note that this is written this way instead of using Method* above since
+// pegjs and pigeon treat these cases differently (empty slice vs null) and
+// it matters for test consistency since methods is an embedded array rather
+// than a stand-alone AST node with its own Op code.
+Methods
+  = methods:Method+ { RETURN(methods) }
+  / "" { RETURN(NULL) }
+
+Method
+  = __ "." __ f:Function { RETURN(f) }
 
 Function
   = !FuncGuard fn:IdentifierName __ "(" __ args:ArgumentList __ ")" {
@@ -660,11 +675,11 @@ Deref
     }
   / "[" __ ":" __ to:AdditiveExpr "]" {
       RETURN(ARRAY("[", MAP("op": "BinaryExpr", "operator":":",
-                            "lhs":MAP("op":"Empty"), "rhs":to)))
+                            "lhs": NULL, "rhs":to)))
     }
   / "[" from:AdditiveExpr __ ":" __ "]" {
       RETURN(ARRAY("[", MAP("op": "BinaryExpr", "operator":":",
-                            "lhs":from, "rhs":MAP("op":"Empty"))))
+                            "lhs":from, "rhs": NULL)))
     }
   / "[" expr:Expr "]" { RETURN(ARRAY("[", expr)) }
   / "." !(".") id:Identifier { RETURN(ARRAY(".", id)) }

@@ -1,0 +1,14 @@
+script: ast -C -P 2 -sortKey ts "* | cut ts, foo=x | uniq"
+
+outputs:
+  - name: stdout
+    data: |
+      split (
+        =>
+          filter *
+          | cut ts=ts,foo=x
+        =>
+          filter *
+          | cut ts=ts,foo=x
+      ) merge-by ts
+      | uniq

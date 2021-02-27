@@ -59,7 +59,7 @@ func compileAgg(zctx *resolver.Context, scope *Scope, assignment ast.Assignment)
 	if assignment.LHS == nil {
 		lhs = field.New(aggOp)
 	} else {
-		lhs, err = CompileLval(assignment.LHS)
+		lhs, err = compileLval(assignment.LHS)
 		if err != nil {
 			return nil, nil, fmt.Errorf("lhs of aggregation: %w", err)
 		}

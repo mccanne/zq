@@ -13,9 +13,9 @@ import (
 	"github.com/brimsec/zq/api"
 	"github.com/brimsec/zq/compiler"
 	"github.com/brimsec/zq/compiler/ast"
-	"github.com/brimsec/zq/compiler/semantic"
 	"github.com/brimsec/zq/driver"
 	"github.com/brimsec/zq/pkg/test"
+	"github.com/brimsec/zq/proc"
 	"github.com/brimsec/zq/proc/groupby"
 	"github.com/brimsec/zq/proc/proctest"
 	"github.com/brimsec/zq/zbuf"
@@ -270,6 +270,16 @@ func TestGroupbySystem(t *testing.T) {
 	})
 }
 
+func setSortDir(p ast.Proc, dir int) {
+	//XXX this is fragile.  These tests should use ztest at some point.
+	// It's awkward to set the input sort direction because the tests
+	// are writen at too low a level and what we're really doign here
+	// is saying that the group-by keys are sorted and we should be
+	// using compiler.NewWithSortedInput and passing in the group-by key
+	// for the sortKey.
+	p.(*ast.SequentialProc).Procs[0].(*ast.GroupByProc).InputSortDir = dir
+}
+
 func compileGroupBy(code string) (*ast.GroupByProc, error) {
 	parsed, err := compiler.ParseProc(code)
 	if err != nil {
@@ -370,26 +380,28 @@ func TestGroupbyUnit(t *testing.T) {
 
 	runner := func(zql string, dir int, in, out []string) func(t *testing.T) {
 		return func(t *testing.T) {
-			resolver := resolver.NewContext()
+			zctx := resolver.NewContext()
 			var inBatches []zbuf.Batch
 			for _, s := range in {
-				b, err := proctest.ParseTestTzng(resolver, s)
+				b, err := proctest.ParseTestTzng(zctx, s)
 				require.NoError(t, err, s)
 				inBatches = append(inBatches, b)
 			}
 
-			astProc, err := compileGroupBy(zql)
+			runtime, err := compiler.NewWithZ(zctx, zql)
 			assert.NoError(t, err)
-			semantic.Transform(astProc)
-			astProc.InputSortDir = dir
-			tctx := proctest.NewTestContext(resolver)
+			setSortDir(runtime.Entry(), dir)
+
+			pctx := proctest.NewTestContext(zctx)
 			src := proctest.NewTestSource(inBatches)
-			gproc, err := proctest.CompileTestProcAST(astProc, tctx, src)
+			err = runtime.Compile(nil, pctx, []proc.Interface{src})
 			assert.NoError(t, err)
-			procTest := proctest.NewProcTest(gproc, tctx)
+			outputs := runtime.Outputs()
+			assert.Equal(t, 1, len(outputs))
+			procTest := proctest.NewProcTest(outputs[0], pctx)
 
 			for _, s := range out {
-				b, err := proctest.ParseTestTzng(resolver, s)
+				b, err := proctest.ParseTestTzng(zctx, s)
 				require.NoError(t, err, s)
 				err = procTest.Expect(b)
 				assert.NoError(t, err)

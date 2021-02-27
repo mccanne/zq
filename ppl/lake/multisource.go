@@ -60,7 +60,7 @@ func newSpanScanner(ctx context.Context, lk *Lake, zctx *resolver.Context, sf dr
 		stats.ChunksReadBytes += rc.ReadSize
 		closers = append(closers, rc)
 		reader := zngio.NewReader(rc, zctx)
-		scanner, err := reader.NewScanner(ctx, sf.Filter, si.Span)
+		scanner, err := reader.NewScanner(ctx, sf.Runtime, si.Span)
 		if err != nil {
 			closers.Close()
 			return nil, stats, err
@@ -255,7 +255,7 @@ func (s *chunkSource) Open(ctx context.Context, zctx *resolver.Context, sf drive
 		paths[i] = u.String()
 	}
 	rc := detector.MultiFileReader(zctx, paths, zio.ReaderOpts{Format: "zng"})
-	sn, err := zbuf.NewScanner(ctx, rc, sf.Filter, sf.Span)
+	sn, err := zbuf.NewScanner(ctx, rc, sf.Runtime, sf.Span)
 	if err != nil {
 		rc.Close()
 		return nil, err

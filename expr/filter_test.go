@@ -43,21 +43,19 @@ func runCasesHelper(t *testing.T, tzng string, cases []testcase, expectBufferFil
 		t.Run(c.filter, func(t *testing.T) {
 			t.Helper()
 
-			proc, err := compiler.ParseProc(c.filter)
+			p, err := compiler.ParseProc(c.filter)
 			require.NoError(t, err, "filter: %q", c.filter)
-			fproc := filterProc(proc)
-			require.NotNil(t, fproc)
-			filterExpr := fproc.Filter
+			runtime, err := compiler.New(resolver.NewContext(), p)
+			require.NoError(t, err, "filter: %q", c.filter)
 
-			filterAST := compiler.NewFilter(zctx, filterExpr)
-			f, err := filterAST.AsFilter()
+			f, err := runtime.AsFilter()
 			assert.NoError(t, err, "filter: %q", c.filter)
 			if f != nil {
 				assert.Equal(t, c.expected, f(rec),
 					"filter: %q\nrecord:\n%s", c.filter, hex.Dump(rec.Raw))
 			}
 
-			bf, err := filterAST.AsBufferFilter()
+			bf, err := runtime.AsBufferFilter()
 			assert.NoError(t, err, "filter: %q", c.filter)
 			if bf != nil {
 				expected := c.expected
@@ -527,9 +525,6 @@ func TestBadFilter(t *testing.T) {
 	t.Parallel()
 	proc, err := compiler.ParseProc(`s = \xa8*`)
 	require.NoError(t, err)
-	fproc := filterProc(proc)
-	require.NotNil(t, fproc)
-	f := compiler.NewFilter(resolver.NewContext(), fproc.Filter)
-	_, err = f.AsFilter()
-	assert.Error(t, err, "Received error for bad glob")
+	_, err = compiler.New(resolver.NewContext(), proc)
+	assert.Error(t, err, "error parsing regexp: invalid UTF-8: `^\xa8.*$`")
 }

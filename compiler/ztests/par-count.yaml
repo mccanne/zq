@@ -1,0 +1,17 @@
+script: ast -C -P 2 -sortKey ts "* | count() by y"
+
+outputs:
+  - name: stdout
+    data: |
+      split (
+        =>
+          filter *
+          | summarize partials-out
+              count=count() by y=y
+        =>
+          filter *
+          | summarize partials-out
+              count=count() by y=y
+      )
+      | summarize partials-in
+          count=count() by y=y

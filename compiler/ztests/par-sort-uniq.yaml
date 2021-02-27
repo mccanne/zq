@@ -1,0 +1,13 @@
+script: ast -C -P 2 -sortKey ts "* | sort | uniq"
+
+outputs:
+  - name: stdout
+    data: |
+      split (
+        =>
+          filter *
+        =>
+          filter *
+      )
+      | sort
+      | uniq

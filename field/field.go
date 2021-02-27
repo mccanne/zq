@@ -27,6 +27,12 @@ func (f Static) Leaf() string {
 }
 
 func (f Static) Equal(to Static) bool {
+	if f == nil {
+		return to == nil
+	}
+	if to == nil {
+		return false
+	}
 	if len(f) != len(to) {
 		return false
 	}

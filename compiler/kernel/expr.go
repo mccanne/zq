@@ -14,11 +14,7 @@ import (
 	"github.com/brimsec/zq/zson"
 )
 
-// TestCompileExpr provides an exported entry point for unit tests
-// to compile expressions (e.g., as is used by expr/expr_test.go).
-func TestCompileExpr(zctx *resolver.Context, node ast.Expression) (expr.Evaluator, error) {
-	return compileExpr(zctx, nil, node)
-}
+var RootField = &ast.FieldPath{Op: "FieldPath", Name: []string{}}
 
 // compileExpr compiles the given Expression into an object
 // that evaluates the expression against a provided Record.  It returns an
@@ -50,63 +46,56 @@ func TestCompileExpr(zctx *resolver.Context, node ast.Expression) (expr.Evaluato
 // TBD: string values and net.IP address do not need to be copied because they
 // are allocated by go libraries and temporary buffers are not used.  This will
 // change down the road when we implement no-allocation string and IP conversion.
-func compileExpr(zctx *resolver.Context, scope *Scope, node ast.Expression) (expr.Evaluator, error) {
-	if scope == nil {
-		// XXX The compiler should be a struct with all of these functions
-		// becoming recievers.  Then, zctx and scope can be member variables
-		// of the compiler.  As compiler becomes more sophisticated, we will
-		// build on this structure.  See issue #2067.
-		scope = &Scope{}
+func compileExpr(zctx *resolver.Context, scope *Scope, e ast.Expression) (expr.Evaluator, error) {
+	if e == nil {
+		return nil, errors.New("null expression not allowed")
 	}
-	switch n := node.(type) {
-	case *ast.Empty:
-		return nil, errors.New("empty expression outside of slice")
+	switch e := e.(type) {
 	case *ast.Literal:
-		return expr.NewLiteral(*n)
+		return expr.NewLiteral(*e)
 	case *ast.Identifier:
-		// If the identifier refers to a named variable in scope (like "$"),
+		// This should be converted in the semantic pass but it can come
+		// over the network from a worker, so we check again.
+		return nil, fmt.Errorf("Z kernel compiler: encountered AST identifier for '%s'", e.Name)
+	case *ast.RootRecord:
+		return nil, fmt.Errorf("Z kernel compiler: encountered AST root record")
+	case *ast.Ref:
+		// If the reference refers to a named variable in scope (like "$"),
 		// then return a Var expression referring to the pointer to the value.
 		// Note that constants may be accessed this way too by entering their
 		// names into the global (outermost) scope in the Scope entity.
-		if ref := scope.Lookup(n.Name); ref != nil {
+		if ref := scope.Lookup(e.Name); ref != nil {
 			return expr.NewVar(ref), nil
 		}
-		return compileExpr(zctx, scope, rootField(n.Name))
-	case *ast.RootRecord:
-		return &expr.RootRecord{}, nil
+		return nil, fmt.Errorf("unknown reference: '%s'", e.Name)
+	case *ast.FieldPath:
+		return expr.NewDotExpr(field.Static(e.Name)), nil
 	case *ast.UnaryExpression:
-		return compileUnary(zctx, scope, *n)
+		return compileUnary(zctx, scope, *e)
 	case *ast.SelectExpression:
-		return nil, errors.New("select expression found outside of generator context")
+		return nil, errors.New("Z kernel: encountered select expression")
 	case *ast.BinaryExpression:
-		return compileBinary(zctx, scope, n.Operator, n.LHS, n.RHS)
+		return compileBinary(zctx, scope, e)
 	case *ast.ConditionalExpression:
-		return compileConditional(zctx, scope, *n)
+		return compileConditional(zctx, scope, *e)
 	case *ast.FunctionCall:
-		return compileCall(zctx, scope, *n)
+		return compileCall(zctx, scope, *e)
 	case *ast.CastExpression:
-		return compileCast(zctx, scope, *n)
+		return compileCast(zctx, scope, *e)
 	case *ast.TypeExpr:
-		return compileTypeExpr(zctx, scope, *n)
+		return compileTypeExpr(zctx, scope, *e)
+	case *ast.SeqExpr:
+		return compileSeqExpr(zctx, scope, e)
 	default:
-		return nil, fmt.Errorf("invalid expression type %T", node)
+		return nil, fmt.Errorf("invalid expression type %T", e)
 	}
 }
 
-func compileExprWithEmpty(zctx *resolver.Context, scope *Scope, node ast.Expression) (expr.Evaluator, error) {
-	if _, ok := node.(*ast.Empty); ok {
+func compileExprWithEmpty(zctx *resolver.Context, scope *Scope, e ast.Expression) (expr.Evaluator, error) {
+	if e == nil {
 		return nil, nil
 	}
-	return compileExpr(zctx, scope, node)
-}
-
-func rootField(name string) *ast.BinaryExpression {
-	return &ast.BinaryExpression{
-		Op:       "BinaryExpr",
-		Operator: ".",
-		LHS:      &ast.RootRecord{"RootRecord"},
-		RHS:      &ast.Identifier{Name: name},
-	}
+	return compileExpr(zctx, scope, e)
 }
 
 func CompileExprs(zctx *resolver.Context, scope *Scope, nodes []ast.Expression) ([]expr.Evaluator, error) {
@@ -121,24 +110,28 @@ func CompileExprs(zctx *resolver.Context, scope *Scope, nodes []ast.Expression) 
 	return exprs, nil
 }
 
-func compileBinary(zctx *resolver.Context, scope *Scope, op string, LHS, RHS ast.Expression) (expr.Evaluator, error) {
-	if op == "." {
-		return compileDotExpr(zctx, scope, LHS, RHS)
+func compileBinary(zctx *resolver.Context, scope *Scope, e *ast.BinaryExpression) (expr.Evaluator, error) {
+	if slice, ok := e.RHS.(*ast.BinaryExpression); ok && slice.Operator == ":" {
+		return compileSlice(zctx, scope, e.LHS, slice)
 	}
-	if op == "@" {
-		return nil, errors.New("generator expression encountered outside of aggregator")
-	}
-	if slice, ok := RHS.(*ast.BinaryExpression); ok && slice.Operator == ":" {
-		return compileSlice(zctx, scope, LHS, slice)
-	}
-	lhs, err := compileExpr(zctx, scope, LHS)
+	lhs, err := compileExpr(zctx, scope, e.LHS)
 	if err != nil {
 		return nil, err
 	}
-	rhs, err := compileExpr(zctx, scope, RHS)
+	if e.Operator == "." {
+		// XXX There should be a DotOperator in the ast that is not
+		// an Identifier.  Leave for now. See issue #2255.
+		id, ok := e.RHS.(*ast.Identifier)
+		if !ok {
+			return nil, fmt.Errorf("Z kernel: RHS of dot operator is not a name")
+		}
+		return expr.NewDotAccess(lhs, id.Name), nil
+	}
+	rhs, err := compileExpr(zctx, scope, e.RHS)
 	if err != nil {
 		return nil, err
 	}
+	op := e.Operator
 	switch op {
 	case "and", "or":
 		return compileLogical(lhs, rhs, op)
@@ -155,7 +148,7 @@ func compileBinary(zctx *resolver.Context, scope *Scope, op string, LHS, RHS ast
 	case "[":
 		return expr.NewIndexExpr(zctx, lhs, rhs)
 	default:
-		return nil, fmt.Errorf("invalid binary operator %s", op)
+		return nil, fmt.Errorf("Z kernel: invalid binary operator %s", op)
 	}
 }
 
@@ -175,33 +168,28 @@ func compileSlice(zctx *resolver.Context, scope *Scope, container ast.Expression
 	return expr.NewSlice(e, from, to), nil
 }
 
-func compileGenerator(zctx *resolver.Context, scope *Scope, e ast.Expression) (expr.Generator, error) {
-	switch e := e.(type) {
-	case *ast.BinaryExpression:
-		if e.Operator != "@" {
-			return nil, fmt.Errorf("bad expression in generator: %s", e.Operator)
-		}
-		src, err := compileGenerator(zctx, scope, e.LHS)
-		if err != nil {
-			return nil, err
-		}
-		return compileMethod(zctx, scope, src, e.RHS)
-	case *ast.SelectExpression:
-		exprs, err := compileExprs(zctx, scope, e.Selectors)
-		if err != nil {
-			return nil, err
-		}
-		return expr.NewSelector(exprs), nil
+func compileSeqExpr(zctx *resolver.Context, scope *Scope, seq *ast.SeqExpr) (expr.Evaluator, error) {
+	selectors, err := compileExprs(zctx, scope, seq.Selectors)
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("bad generator expression: %T", e)
+	selector := expr.NewSelector(selectors)
+	sequence := expr.Generator(selector)
+	for _, method := range seq.Methods {
+		sequence, err = compileMethod(zctx, scope, sequence, method)
+		if err != nil {
+			return nil, err
+		}
+	}
+	pattern, err := agg.NewPattern(seq.Name)
+	if err != nil {
+		return nil, err
+	}
+	return expr.NewAggExpr(zctx, pattern, sequence), nil
 }
 
-func compileMethod(zctx *resolver.Context, scope *Scope, src expr.Generator, e ast.Expression) (expr.Generator, error) {
-	method, ok := e.(*ast.FunctionCall)
-	if !ok {
-		return nil, fmt.Errorf("bad method expression: %T", e)
-	}
-	switch method.Function {
+func compileMethod(zctx *resolver.Context, scope *Scope, src expr.Generator, method ast.Method) (expr.Generator, error) {
+	switch method.Name {
 	case "map":
 		if len(method.Args) != 1 {
 			return nil, errors.New("map() method requires one argument")
@@ -232,27 +220,8 @@ func compileMethod(zctx *resolver.Context, scope *Scope, src expr.Generator, e a
 		filterMethod.Set(filterExpr)
 		return filterMethod, nil
 	default:
-		return nil, fmt.Errorf("uknown method: %s", method.Function)
+		return nil, fmt.Errorf("uknown method: %s", method.Name)
 	}
-}
-
-// compileMethodChain tries to compile the given function call as an aggregation
-// function operating on a generator.  If this fails with an error or (nil,nil),
-// then it doesn't have the required shape and the caller can try compiling
-// this AST node a different way.
-func compileMethodChain(zctx *resolver.Context, scope *Scope, call ast.FunctionCall) (expr.Evaluator, error) {
-	if len(call.Args) != 1 {
-		return nil, nil
-	}
-	pattern, err := agg.NewPattern(call.Function)
-	if err != nil {
-		return nil, nil
-	}
-	gen, err := compileGenerator(zctx, scope, call.Args[0])
-	if gen == nil || err != nil {
-		return nil, nil
-	}
-	return expr.NewAggExpr(zctx, pattern, gen), nil
 }
 
 func compileUnary(zctx *resolver.Context, scope *Scope, node ast.UnaryExpression) (expr.Evaluator, error) {
@@ -318,65 +287,21 @@ func compileCast(zctx *resolver.Context, scope *Scope, node ast.CastExpression) 
 	return expr.NewCast(e, typ)
 }
 
-func CompileLval(node ast.Expression) (field.Static, error) {
-	switch node := node.(type) {
-	case *ast.RootRecord:
-		return field.NewRoot(), nil
-	// XXX We need to allow index operators at some point, but for now
-	// we have been assuming only dotted field lvalues.  See Issue #1462.
-	case *ast.BinaryExpression:
-		if node.Operator != "." {
-			break
-		}
-		id, ok := node.RHS.(*ast.Identifier)
-		if !ok {
-			return nil, errors.New("rhs of dot operator is not an identifier")
-		}
-		lhs, err := CompileLval(node.LHS)
-		if err != nil {
-			return nil, err
-		}
-		return append(lhs, id.Name), nil
-	case *ast.Identifier:
-		return CompileLval(rootField(node.Name))
+func compileLval(e ast.Expression) (field.Static, error) {
+	if e, ok := e.(*ast.FieldPath); ok {
+		return field.Static(e.Name), nil
 	}
 	return nil, errors.New("invalid expression on lhs of assignment")
 }
 
-var ErrInference = errors.New("assignment name could not be inferred from rhs expression")
-
 func CompileAssignment(zctx *resolver.Context, scope *Scope, node *ast.Assignment) (expr.Assignment, error) {
+	lhs, err := compileLval(node.LHS)
+	if err != nil {
+		return expr.Assignment{}, err
+	}
 	rhs, err := compileExpr(zctx, scope, node.RHS)
 	if err != nil {
 		return expr.Assignment{}, fmt.Errorf("rhs of assigment expression: %w", err)
-	}
-	var lhs field.Static
-	if node.LHS != nil {
-		lhs, err = CompileLval(node.LHS)
-		if err != nil {
-			return expr.Assignment{}, fmt.Errorf("lhs of assigment expression: %w", err)
-		}
-	} else {
-		switch rhs := node.RHS.(type) {
-		case *ast.RootRecord:
-			lhs = field.New(".")
-		case *ast.Identifier:
-			lhs = field.New(rhs.Name)
-		case *ast.FunctionCall:
-			lhs = field.New(rhs.Function)
-		case *ast.BinaryExpression:
-			// This can be a dotted record or some other expression.
-			// In the latter case, it might be nice to infer a name,
-			// e.g., forr "count() by a+b" we could infer "sum" for
-			// the name, i,e., "count() by sum=a+b".  But for now,
-			// we'll just catch this as an error.
-			lhs, err = CompileLval(rhs)
-			if err != nil {
-				err = ErrInference
-			}
-		default:
-			err = ErrInference
-		}
 	}
 	return expr.Assignment{lhs, rhs}, err
 }
@@ -443,7 +368,7 @@ func isShaperFunc(name string) bool {
 func compileShaper(zctx *resolver.Context, scope *Scope, node ast.FunctionCall) (*expr.Shaper, error) {
 	args := node.Args
 	if len(args) == 1 {
-		args = append([]ast.Expression{&ast.RootRecord{}}, args...)
+		args = append([]ast.Expression{RootField}, args...)
 	}
 	if len(args) < 2 {
 		return nil, function.ErrTooFewArgs
@@ -463,7 +388,6 @@ func compileShaper(zctx *resolver.Context, scope *Scope, node ast.FunctionCall) 
 }
 
 func compileCall(zctx *resolver.Context, scope *Scope, node ast.FunctionCall) (expr.Evaluator, error) {
-
 	// For now, we special case cut and pick here.  We shuold generalize this
 	// as we will add many more stateful functions and also resolve this
 	// the changes to create running aggegation functions from reducers.
@@ -482,9 +406,6 @@ func compileCall(zctx *resolver.Context, scope *Scope, node ast.FunctionCall) (e
 	if isShaperFunc(node.Function) {
 		return compileShaper(zctx, scope, node)
 	}
-	if e, err := compileMethodChain(zctx, scope, node); e != nil || err != nil {
-		return e, err
-	}
 	if node.Function == "exists" {
 		exprs, err := compileExprs(zctx, scope, node.Args)
 		if err != nil {
@@ -499,7 +420,7 @@ func compileCall(zctx *resolver.Context, scope *Scope, node ast.FunctionCall) (e
 	}
 	args := node.Args
 	if root {
-		args = append([]ast.Expression{&ast.RootRecord{}}, args...)
+		args = append([]ast.Expression{RootField}, args...)
 	}
 	exprs, err := compileExprs(zctx, scope, args)
 	if err != nil {

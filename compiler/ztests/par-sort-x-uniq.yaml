@@ -1,0 +1,14 @@
+script: ast -C -P 2 -sortKey ts "* | sort x | uniq"
+
+outputs:
+  - name: stdout
+    data: |
+      split (
+        =>
+          filter *
+          | sort x
+        =>
+          filter *
+          | sort x
+      ) merge-by x
+      | uniq

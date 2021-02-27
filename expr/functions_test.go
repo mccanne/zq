@@ -8,7 +8,6 @@ import (
 	"github.com/brimsec/zq/expr/function"
 	"github.com/brimsec/zq/pkg/nano"
 	"github.com/brimsec/zq/zng"
-	"github.com/stretchr/testify/require"
 )
 
 func zaddr(addr string) zng.Value {
@@ -17,14 +16,13 @@ func zaddr(addr string) zng.Value {
 }
 
 func TestBadFunction(t *testing.T) {
-	testError(t, "notafunction()", nil, function.ErrNoSuchFunction, "calling nonexistent function")
+	testError(t, "notafunction()", "", function.ErrNoSuchFunction, "calling nonexistent function")
 }
 
 func TestAbs(t *testing.T) {
-	record, err := parseOneRecord(`
+	record := `
 #0:record[u:uint64]
-0:[50;]`)
-	require.NoError(t, err)
+0:[50;]`
 
 	testSuccessful(t, "abs(-5)", record, zint64(5))
 	testSuccessful(t, "abs(5)", record, zint64(5))
@@ -38,10 +36,9 @@ func TestAbs(t *testing.T) {
 }
 
 func TestSqrt(t *testing.T) {
-	record, err := parseOneRecord(`
+	record := `
 #0:record[f:float64,i:int32]
-0:[6.25;9;]`)
-	require.NoError(t, err)
+0:[6.25;9;]`
 
 	testSuccessful(t, "sqrt(4.0)", record, zfloat64(2.0))
 	testSuccessful(t, "sqrt(f)", record, zfloat64(2.5))
@@ -53,10 +50,9 @@ func TestSqrt(t *testing.T) {
 }
 
 func TestMinMax(t *testing.T) {
-	record, err := parseOneRecord(`
+	record := `
 #0:record[i:uint64,f:float64]
-0:[1;2;]`)
-	require.NoError(t, err)
+0:[1;2;]`
 
 	// Simple cases
 	testSuccessful(t, "min(1)", record, zint64(1))
@@ -89,47 +85,46 @@ func TestMinMax(t *testing.T) {
 }
 
 func TestCeilFloorRound(t *testing.T) {
-	testSuccessful(t, "ceil(1.5)", nil, zfloat64(2))
-	testSuccessful(t, "floor(1.5)", nil, zfloat64(1))
-	testSuccessful(t, "round(1.5)", nil, zfloat64(2))
+	testSuccessful(t, "ceil(1.5)", "", zfloat64(2))
+	testSuccessful(t, "floor(1.5)", "", zfloat64(1))
+	testSuccessful(t, "round(1.5)", "", zfloat64(2))
 
-	testSuccessful(t, "ceil(5)", nil, zint64(5))
-	testSuccessful(t, "floor(5)", nil, zint64(5))
-	testSuccessful(t, "round(5)", nil, zint64(5))
+	testSuccessful(t, "ceil(5)", "", zint64(5))
+	testSuccessful(t, "floor(5)", "", zint64(5))
+	testSuccessful(t, "round(5)", "", zint64(5))
 
-	testError(t, "ceil()", nil, function.ErrTooFewArgs, "ceil() with no args")
-	testError(t, "ceil(1, 2)", nil, function.ErrTooManyArgs, "ceil() with too many args")
-	testError(t, "floor()", nil, function.ErrTooFewArgs, "floor() with no args")
-	testError(t, "floor(1, 2)", nil, function.ErrTooManyArgs, "floor() with too many args")
-	testError(t, "round()", nil, function.ErrTooFewArgs, "round() with no args")
-	testError(t, "round(1, 2)", nil, function.ErrTooManyArgs, "round() with too many args")
+	testError(t, "ceil()", "", function.ErrTooFewArgs, "ceil() with no args")
+	testError(t, "ceil(1, 2)", "", function.ErrTooManyArgs, "ceil() with too many args")
+	testError(t, "floor()", "", function.ErrTooFewArgs, "floor() with no args")
+	testError(t, "floor(1, 2)", "", function.ErrTooManyArgs, "floor() with too many args")
+	testError(t, "round()", "", function.ErrTooFewArgs, "round() with no args")
+	testError(t, "round(1, 2)", "", function.ErrTooManyArgs, "round() with too many args")
 }
 
 func TestLogPow(t *testing.T) {
 	// Math.log() computes natural logarithm.  Rather than writing
 	// out long floating point numbers in the parameters or results,
 	// use more complex expressions that evaluate to simpler values.
-	testSuccessful(t, "log(32) / log(2)", nil, zfloat64(5))
-	testSuccessful(t, "log(32.0) / log(2.0)", nil, zfloat64(5))
+	testSuccessful(t, "log(32) / log(2)", "", zfloat64(5))
+	testSuccessful(t, "log(32.0) / log(2.0)", "", zfloat64(5))
 
-	testSuccessful(t, "pow(10, 2)", nil, zfloat64(100))
-	testSuccessful(t, "pow(4.0, 1.5)", nil, zfloat64(8))
+	testSuccessful(t, "pow(10, 2)", "", zfloat64(100))
+	testSuccessful(t, "pow(4.0, 1.5)", "", zfloat64(8))
 
-	testError(t, "log()", nil, function.ErrTooFewArgs, "log() with no args")
-	testError(t, "log(2, 3)", nil, function.ErrTooManyArgs, "log() with too many args")
-	testError(t, "log(0)", nil, function.ErrBadArgument, "log() of 0")
-	testError(t, "log(-1)", nil, function.ErrBadArgument, "log() of negative number")
+	testError(t, "log()", "", function.ErrTooFewArgs, "log() with no args")
+	testError(t, "log(2, 3)", "", function.ErrTooManyArgs, "log() with too many args")
+	testError(t, "log(0)", "", function.ErrBadArgument, "log() of 0")
+	testError(t, "log(-1)", "", function.ErrBadArgument, "log() of negative number")
 
-	testError(t, "pow()", nil, function.ErrTooFewArgs, "pow() with no args")
-	testError(t, "pow(2, 3, r)", nil, function.ErrTooManyArgs, "pow() with too many args")
-	testError(t, "pow(-1, 0.5)", nil, function.ErrBadArgument, "pow() with invalid arguments")
+	testError(t, "pow()", "", function.ErrTooFewArgs, "pow() with no args")
+	testError(t, "pow(2, 3, r)", "", function.ErrTooManyArgs, "pow() with too many args")
+	testError(t, "pow(-1, 0.5)", "", function.ErrBadArgument, "pow() with invalid arguments")
 }
 
 func TestMod(t *testing.T) {
-	record, err := parseOneRecord(`
+	record := `
 #0:record[u:uint64]
-0:[5;]`)
-	require.NoError(t, err)
+0:[5;]`
 
 	testSuccessful(t, "mod(5, 3)", record, zint64(2))
 	testSuccessful(t, "mod(u, 3)", record, zuint64(2))
@@ -142,29 +137,28 @@ func TestMod(t *testing.T) {
 }
 
 func TestOtherStrFuncs(t *testing.T) {
-	testSuccessful(t, `replace("bann", "n", "na")`, nil, zstring("banana"))
-	testError(t, `replace("foo", "bar")`, nil, function.ErrTooFewArgs, "replace() with too few args")
-	testError(t, `replace("foo", "bar", "baz", "blort")`, nil, function.ErrTooManyArgs, "replace() with too many args")
-	testError(t, `replace("foo", "o", 5)`, nil, function.ErrBadArgument, "replace() with non-string arg")
+	testSuccessful(t, `replace("bann", "n", "na")`, "", zstring("banana"))
+	testError(t, `replace("foo", "bar")`, "", function.ErrTooFewArgs, "replace() with too few args")
+	testError(t, `replace("foo", "bar", "baz", "blort")`, "", function.ErrTooManyArgs, "replace() with too many args")
+	testError(t, `replace("foo", "o", 5)`, "", function.ErrBadArgument, "replace() with non-string arg")
 
-	testSuccessful(t, `to_lower("BOO")`, nil, zstring("boo"))
-	testError(t, `to_lower()`, nil, function.ErrTooFewArgs, "toLower() with no args")
-	testError(t, `to_lower("BOO", "HOO")`, nil, function.ErrTooManyArgs, "toLower() with too many args")
+	testSuccessful(t, `to_lower("BOO")`, "", zstring("boo"))
+	testError(t, `to_lower()`, "", function.ErrTooFewArgs, "toLower() with no args")
+	testError(t, `to_lower("BOO", "HOO")`, "", function.ErrTooManyArgs, "toLower() with too many args")
 
-	testSuccessful(t, `to_upper("boo")`, nil, zstring("BOO"))
-	testError(t, `to_upper()`, nil, function.ErrTooFewArgs, "toUpper() with no args")
-	testError(t, `to_upper("boo", "hoo")`, nil, function.ErrTooManyArgs, "toUpper() with too many args")
+	testSuccessful(t, `to_upper("boo")`, "", zstring("BOO"))
+	testError(t, `to_upper()`, "", function.ErrTooFewArgs, "toUpper() with no args")
+	testError(t, `to_upper("boo", "hoo")`, "", function.ErrTooManyArgs, "toUpper() with too many args")
 
-	testSuccessful(t, `trim("  hi  there   ")`, nil, zstring("hi  there"))
-	testError(t, `trim()`, nil, function.ErrTooFewArgs, "trim() with no args")
-	testError(t, `trim("  hi  ", "  there  ")`, nil, function.ErrTooManyArgs, "trim() with too many args")
+	testSuccessful(t, `trim("  hi  there   ")`, "", zstring("hi  there"))
+	testError(t, `trim()`, "", function.ErrTooFewArgs, "trim() with no args")
+	testError(t, `trim("  hi  ", "  there  ")`, "", function.ErrTooManyArgs, "trim() with too many args")
 }
 
 func TestLen(t *testing.T) {
-	record, err := parseOneRecord(`
+	record := `
 #0:record[s:set[int32],a:array[int32]]
-0:[[1;2;3;][4;5;6;]]`)
-	require.NoError(t, err)
+0:[[1;2;3;][4;5;6;]]`
 
 	testSuccessful(t, "len(s)", record, zint64(3))
 	testSuccessful(t, "len(a)", record, zint64(3))
@@ -173,10 +167,9 @@ func TestLen(t *testing.T) {
 	testError(t, `len("foo", "bar")`, record, function.ErrTooManyArgs, "len() with too many args")
 	testError(t, "len(5)", record, function.ErrBadArgument, "len() with non-container arg")
 
-	record, err = parseOneRecord(`
+	record = `
 #0:record[s:string,bs:bstring,bs2:bstring]
-0:[🍺;\xf0\x9f\x8d\xba;\xba\x8d\x9f\xf0;]`)
-	require.NoError(t, err)
+0:[🍺;\xf0\x9f\x8d\xba;\xba\x8d\x9f\xf0;]`
 
 	testSuccessful(t, `len("foo")`, record, zint64(3))
 	testSuccessful(t, `len(s)`, record, zint64(4))
@@ -197,26 +190,26 @@ func TestTime(t *testing.T) {
 	zval := zng.Value{zng.TypeTime, zng.EncodeTime(nano.Ts(nsec))}
 
 	exp := fmt.Sprintf(`iso("%s")`, iso)
-	testSuccessful(t, exp, nil, zval)
+	testSuccessful(t, exp, "", zval)
 	exp = fmt.Sprintf("msec(%d):time", msec)
-	testSuccessful(t, exp, nil, zval)
+	testSuccessful(t, exp, "", zval)
 	exp = fmt.Sprintf("msec(%d.0):time", msec)
-	testSuccessful(t, exp, nil, zval)
+	testSuccessful(t, exp, "", zval)
 	exp = fmt.Sprintf("usec(%d):time", msec*1000)
-	testSuccessful(t, exp, nil, zval)
+	testSuccessful(t, exp, "", zval)
 	exp = fmt.Sprintf("usec(%d.0):time", msec*1000)
-	testSuccessful(t, exp, nil, zval)
+	testSuccessful(t, exp, "", zval)
 	exp = fmt.Sprintf("%d:time", nsec)
-	testSuccessful(t, exp, nil, zval)
-	testSuccessful(t, "trunc(1590506867.967, 1)", nil, zng.Value{zng.TypeTime, zng.EncodeTime(nano.Ts(1590506867 * 1_000_000_000))})
+	testSuccessful(t, exp, "", zval)
+	testSuccessful(t, "trunc(1590506867.967, 1)", "", zng.Value{zng.TypeTime, zng.EncodeTime(nano.Ts(1590506867 * 1_000_000_000))})
 
-	testError(t, "iso()", nil, function.ErrTooFewArgs, "Time.fromISO() with no args")
-	testError(t, `iso("abc", "def")`, nil, function.ErrTooManyArgs, "Time.fromISO() with too many args")
-	testError(t, "iso(1234)", nil, function.ErrBadArgument, "Time.fromISO() with wrong argument type")
+	testError(t, "iso()", "", function.ErrTooFewArgs, "Time.fromISO() with no args")
+	testError(t, `iso("abc", "def")`, "", function.ErrTooManyArgs, "Time.fromISO() with too many args")
+	testError(t, "iso(1234)", "", function.ErrBadArgument, "Time.fromISO() with wrong argument type")
 
-	testError(t, "msec()", nil, function.ErrTooFewArgs, "Time.fromMilliseconds() with no args")
-	testError(t, "msec(123, 456)", nil, function.ErrTooManyArgs, "Time.fromMilliseconds() with too many args")
+	testError(t, "msec()", "", function.ErrTooFewArgs, "Time.fromMilliseconds() with no args")
+	testError(t, "msec(123, 456)", "", function.ErrTooManyArgs, "Time.fromMilliseconds() with too many args")
 
-	testError(t, "usec()", nil, function.ErrTooFewArgs, "Time.fromMicroseconds() with no args")
-	testError(t, "usec(123, 456)", nil, function.ErrTooManyArgs, "Time.fromMicroseconds() with too many args")
+	testError(t, "usec()", "", function.ErrTooFewArgs, "Time.fromMicroseconds() with no args")
+	testError(t, "usec(123, 456)", "", function.ErrTooManyArgs, "Time.fromMicroseconds() with too many args")
 }

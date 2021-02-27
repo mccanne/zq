@@ -12,8 +12,10 @@ import (
 	"strings"
 
 	"github.com/brimsec/zq/compiler"
-	"github.com/brimsec/zq/compiler/semantic"
+	"github.com/brimsec/zq/compiler/ast"
+	"github.com/brimsec/zq/field"
 	"github.com/brimsec/zq/zfmt"
+	"github.com/brimsec/zq/zng/resolver"
 	"github.com/brimsec/zq/zql"
 	"github.com/mccanne/charm"
 	"github.com/peterh/liner"
@@ -50,11 +52,14 @@ type Command struct {
 	repl     bool
 	js       bool
 	pigeon   bool
-	ast      bool
-	all      bool
-	optimize bool
-	debug    bool
+	proc     bool
 	canon    bool
+	filter   bool
+	semantic bool
+	optimize bool
+	parallel int
+	sortKey  string
+	sortRev  bool
 	n        int
 	includes includes
 }
@@ -63,12 +68,15 @@ func New(f *flag.FlagSet) (charm.Command, error) {
 	c := &Command{}
 	f.BoolVar(&c.repl, "repl", false, "enter repl")
 	f.BoolVar(&c.js, "js", false, "run javascript version of peg parser")
-	f.BoolVar(&c.pigeon, "pigeon", true, "run pigeon version of peg parser")
-	f.BoolVar(&c.ast, "ast", false, "run pigeon version of peg parser and show marshaled ast")
-	f.BoolVar(&c.all, "all", false, "run all and show variants")
-	f.BoolVar(&c.optimize, "O", true, "run semantic optimizer on ast version")
-	f.BoolVar(&c.debug, "D", false, "display ast version as lisp-y debugger output")
-	f.BoolVar(&c.canon, "C", false, "display canonical version")
+	f.BoolVar(&c.pigeon, "pigeon", false, "run pigeon version of peg parser")
+	f.BoolVar(&c.proc, "proc", false, "run pigeon version of peg parser and marshal into ast.Proc")
+	f.BoolVar(&c.semantic, "s", false, "display semantically analyzed AST (implies -proc)")
+	f.BoolVar(&c.optimize, "O", false, "display optimized, non-filter AST (implies -proc)")
+	f.BoolVar(&c.filter, "f", false, "display AST of lifted filter (implies -proc)")
+	f.IntVar(&c.parallel, "P", 0, "display parallelized AST (implies -proc)")
+	f.StringVar(&c.sortKey, "sortKey", "", "input field for expected sorted data")
+	f.BoolVar(&c.sortRev, "sortRev", false, "true if input is expected in reverse order")
+	f.BoolVar(&c.canon, "C", false, "display AST in Z canonical format (implies -proc)")
 	f.Var(&c.includes, "I", "source file containing Z query text (may be repeated)")
 	return c, nil
 }
@@ -88,16 +96,6 @@ func (c *Command) Run(args []string) error {
 	if len(args) == 0 && len(c.includes) == 0 {
 		return Ast.Exec(c, []string{"help"})
 	}
-	if c.all {
-		c.ast = true
-		c.pigeon = true
-		c.js = true
-	}
-	if c.optimize {
-		c.ast = true
-		c.pigeon = false
-		c.js = false
-	}
 	c.n = 0
 	if c.js {
 		c.n++
@@ -105,8 +103,27 @@ func (c *Command) Run(args []string) error {
 	if c.pigeon {
 		c.n++
 	}
-	if c.ast {
+	if c.proc {
 		c.n++
+	}
+	if c.semantic {
+		c.n++
+	}
+	if c.optimize {
+		c.n++
+	}
+	if c.filter {
+		c.n++
+	}
+	if c.parallel > 0 {
+		c.n++
+	}
+	if c.n == 0 {
+		if c.canon {
+			c.proc = true
+		} else {
+			c.pigeon = true
+		}
 	}
 	if c.repl {
 		c.interactive()
@@ -126,15 +143,22 @@ func (c *Command) Run(args []string) error {
 	return c.parse(src)
 }
 
+func (c *Command) header(msg string) {
+	bars := strings.Repeat("=", len(msg))
+	if c.n > 1 {
+		fmt.Printf("/%s\\\n", bars)
+		fmt.Printf("|%s|\n", msg)
+		fmt.Printf("\\%s/\n", bars)
+	}
+}
+
 func (c *Command) parse(z string) error {
 	if c.js {
 		s, err := parsePEGjs(z)
 		if err != nil {
 			return err
 		}
-		if c.n > 1 {
-			fmt.Println("pegjs")
-		}
+		c.header("pegjs")
 		fmt.Println(s)
 	}
 	if c.pigeon {
@@ -142,22 +166,84 @@ func (c *Command) parse(z string) error {
 		if err != nil {
 			return err
 		}
-		if c.n > 1 {
-			fmt.Println("pigeon")
-		}
+		c.header("pigeon")
 		fmt.Println(s)
 	}
-	if c.ast || c.debug || c.canon {
-		s, err := parseProc(z, c.optimize, c.debug, c.canon)
+	if c.proc {
+		p, err := compiler.ParseProc(z)
 		if err != nil {
 			return err
 		}
-		if c.n > 1 {
-			fmt.Println("ast.Proc")
+		c.header("proc")
+		c.writeProc(p)
+
+	}
+	if c.semantic {
+		runtime, err := c.compile(z)
+		if err != nil {
+			return err
 		}
-		fmt.Println(s)
+		c.header("semantic")
+		c.writeProc(runtime.Entry())
+	}
+	if c.filter {
+		runtime, err := c.compile(z)
+		if err != nil {
+			return err
+		}
+		if err := runtime.Optimize(); err != nil {
+			return err
+		}
+		c.header("lifted filter")
+		c.writeProc(runtime.AsProc())
+	}
+	if c.optimize {
+		runtime, err := c.compile(z)
+		if err != nil {
+			return err
+		}
+		if err := runtime.Optimize(); err != nil {
+			return err
+		}
+		c.header("optimized")
+		c.writeProc(runtime.Entry())
+	}
+	if c.parallel > 0 {
+		runtime, err := c.compile(z)
+		if err != nil {
+			return err
+		}
+		if err := runtime.Optimize(); err != nil {
+			return err
+		}
+		if ok := runtime.Parallelize(c.parallel); !ok {
+			return errors.New("parallellize failed")
+		}
+		c.header("parallelized")
+		c.writeProc(runtime.Entry())
 	}
 	return nil
+}
+
+func (c *Command) writeProc(p ast.Proc) {
+	s, err := procFmt(p, c.canon)
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println(s)
+	}
+}
+
+func (c *Command) compile(z string) (*compiler.Runtime, error) {
+	proc, err := compiler.ParseProc(z)
+	if err != nil {
+		return nil, err
+	}
+	if c.sortKey == "" {
+		return compiler.New(resolver.NewContext(), proc)
+	}
+	sortKey := field.Dotted(c.sortKey)
+	return compiler.NewWithSortedInput(resolver.NewContext(), proc, sortKey, c.sortRev)
 }
 
 const nodeProblem = `
@@ -212,20 +298,7 @@ func parsePEGjs(z string) (string, error) {
 	return normalize(b)
 }
 
-func parseProc(z string, optimize, debug, canon bool) (string, error) {
-	proc, err := compiler.ParseProc(z)
-	if err != nil {
-		return "", err
-	}
-	if optimize {
-		proc, err = semantic.Transform(proc)
-		if err != nil {
-			return "", err
-		}
-	}
-	if debug {
-		return zfmt.Debug(proc), nil
-	}
+func procFmt(proc ast.Proc, canon bool) (string, error) {
 	if canon {
 		return zfmt.Canonical(proc), nil
 	}

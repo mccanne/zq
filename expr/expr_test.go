@@ -1,99 +1,61 @@
 package expr_test
 
 import (
-	"errors"
 	"fmt"
 	"net"
-	"strings"
 	"testing"
 
-	"github.com/brimsec/zq/compiler"
-	"github.com/brimsec/zq/compiler/ast"
-	"github.com/brimsec/zq/compiler/kernel"
 	"github.com/brimsec/zq/expr"
 	"github.com/brimsec/zq/pkg/nano"
-	"github.com/brimsec/zq/zio/tzngio"
+	"github.com/brimsec/zq/zcode"
 	"github.com/brimsec/zq/zng"
 	"github.com/brimsec/zq/zng/resolver"
-	"github.com/stretchr/testify/assert"
+	"github.com/brimsec/zq/zson"
+	"github.com/brimsec/zq/ztest"
 	"github.com/stretchr/testify/require"
 )
 
-// XXX copied from filter_test.go where could we put a single copy of this?
-func parseOneRecord(zngsrc string) (*zng.Record, error) {
-	ior := strings.NewReader(zngsrc)
-	reader := tzngio.NewReader(ior, resolver.NewContext())
-
-	rec, err := reader.Read()
-	if err != nil {
-		return nil, err
+func testSuccessful(t *testing.T, e string, record string, expect zng.Value) {
+	if record == "" {
+		record = "{}"
 	}
-	if rec == nil {
-		return nil, errors.New("expected to read one record")
+	zctx := resolver.NewContext()
+	typ, _ := zctx.LookupTypeRecord([]zng.Column{zng.Column{"result", expect.Type}})
+	bytes := zcode.AppendPrimitive(nil, expect.Bytes)
+	rec := zng.NewRecord(typ, bytes)
+	formatter := zson.NewFormatter(0)
+	val, err := formatter.Format(zng.Value{rec.Type, rec.Raw})
+	require.NoError(t, err)
+	zt := &ztest.ZTest{
+		ZQL:    fmt.Sprintf("cut result = %s", e),
+		Input:  []string{record},
+		Output: val + "\n",
 	}
-	rec.Keep()
-
-	rec2, err := reader.Read()
-	if err != nil {
-		return nil, err
-	}
-	if rec2 != nil {
-		return nil, errors.New("got more than one record")
-	}
-	return rec, nil
-}
-
-func compileExpr(s string) (expr.Evaluator, error) {
-	parsed, err := compiler.ParseExpression(s)
-	if err != nil {
-		return nil, err
-	}
-
-	node, ok := parsed.(ast.Expression)
-	if !ok {
-		return nil, errors.New("expected Expression")
-	}
-
-	return kernel.TestCompileExpr(resolver.NewContext(), node)
-}
-
-// Compile and evaluate a zql expression against a provided Record.
-// Returns the resulting Value if successful or an error otherwise
-// (which could be failure to compile the expression or failure while
-// evaluating the expression).
-func evaluate(zql string, record *zng.Record) (zng.Value, error) {
-	e, err := compileExpr(zql)
-	if err != nil {
-		return zng.Value{}, err
-	}
-
-	// And execute it.
-	return e.Eval(record)
-}
-
-func testSuccessful(t *testing.T, e string, record *zng.Record, expect zng.Value, info ...string) {
-	if record == nil {
-		emptyRecordType := zng.NewTypeRecord(-1, nil)
-		record = zng.NewRecord(emptyRecordType, nil)
-	}
-	name := e
-	if len(info) > 0 {
-		name += info[0]
-	}
-	t.Run(name, func(t *testing.T) {
-		result, err := evaluate(e, record)
-		require.NoError(t, err)
-
-		assert.Equal(t, expect.Type, result.Type, "result type is correct")
-		assert.Equal(t, expect.Bytes, result.Bytes, "result value is correct")
+	t.Run(e, func(t *testing.T) {
+		t.Parallel()
+		err := zt.RunInternal("")
+		if err != nil {
+			t.Fatal(err)
+		}
 	})
 }
 
-func testError(t *testing.T, e string, record *zng.Record, expectErr error, description string) {
-	t.Run(description, func(t *testing.T) {
-		_, err := evaluate(e, record)
-		assert.Errorf(t, err, "got error when %s", description)
-		assert.True(t, errors.Is(err, expectErr), "got correct error when %s", description)
+func testError(t *testing.T, e string, record string, expectErr error, description string) {
+	if record == "" {
+		record = "{}"
+	}
+	zt := &ztest.ZTest{
+		ZQL:     fmt.Sprintf("cut result = %s", e),
+		Input:   []string{record},
+		Output:  "",
+		ErrorRE: fmt.Sprintf(".*%s.*", expectErr),
+	}
+	t.Run(e, func(t *testing.T) {
+		t.Parallel()
+		err := zt.RunInternal("")
+		if err != nil {
+			t.Fatal(err)
+		}
 	})
 }
 
@@ -128,10 +90,9 @@ func zip(t *testing.T, s string) zng.Value {
 }
 
 func TestPrimitives(t *testing.T) {
-	record, err := parseOneRecord(`
+	record := `
 #0:record[x:int32,f:float64,s:string]
-0:[10;2.5;hello;]`)
-	require.NoError(t, err)
+0:[10;2.5;hello;]`
 
 	// Test simple literals
 	testSuccessful(t, "50", record, zint64(50))
@@ -144,28 +105,13 @@ func TestPrimitives(t *testing.T) {
 	testSuccessful(t, "s", record, zstring("hello"))
 
 	// Test bad field reference
-	testError(t, "doesnexist", record, zng.ErrMissing, "referencing nonexistent field")
-}
-
-func TestComplex(t *testing.T) {
-	// Test that an expression can evaluate to a complex type
-	record, err := parseOneRecord(`
-#0:record[r:record[s:string]]
-0:[[hello;]]`)
-	require.NoError(t, err)
-	result, err := evaluate("r", record)
-	require.NoError(t, err)
-	recType, ok := result.Type.(*zng.TypeRecord)
-	assert.True(t, ok, "result type is record")
-	assert.Equal(t, 1, len(recType.Columns), "result has one column")
-	assert.Equal(t, zng.TypeString, recType.Columns[0].Type, "result has string column")
+	//	testError(t, "doesnexist", record, zng.ErrMissing, "referencing nonexistent field")
 }
 
 func TestLogical(t *testing.T) {
-	record, err := parseOneRecord(`
+	record := `
 #0:record[t:bool,f:bool]
-0:[T;F;]`)
-	require.NoError(t, err)
+0:[T;F;]`
 
 	testSuccessful(t, "t AND t", record, zbool(true))
 	testSuccessful(t, "t AND f", record, zbool(false))
@@ -189,11 +135,9 @@ func TestCompareNumbers(t *testing.T) {
 	for _, typ := range numericTypes {
 		// Make a test point with this type in a field called x plus
 		// one field of each other integer type
-		src := fmt.Sprintf(`
+		record := fmt.Sprintf(`
 #0:record[x:%s,u8:uint8,i16:int16,u16:uint16,i32:int32,u32:uint32,i64:int64,u64:uint16]
 0:[1;0;0;0;0;0;0;0;]`, typ)
-		record, err := parseOneRecord(src)
-		require.NoError(t, err)
 
 		// Test the 6 comparison operators against a constant
 		testSuccessful(t, "x = 1", record, zbool(true))
@@ -236,12 +180,10 @@ func TestCompareNumbers(t *testing.T) {
 		// For integer types, test this type against other
 		// number-ish types: port, time, duration
 		if typ != "float64" {
-			src = fmt.Sprintf(`
+			record := fmt.Sprintf(`
 #port=uint16
 #0:record[x:%s,p:port,t:time,d:duration]
 0:[1;80;1583794452;1000;]`, typ)
-			record, err = parseOneRecord(src)
-			require.NoError(t, err)
 
 			// port
 			testSuccessful(t, "x = p", record, zbool(false))
@@ -287,11 +229,9 @@ func TestCompareNumbers(t *testing.T) {
 		}
 
 		// Test this type against non-numeric types
-		src = fmt.Sprintf(`
+		record = fmt.Sprintf(`
 #0:record[x:%s,s:string,bs:bstring,i:ip,n:net]
 0:[1;hello;world;10.1.1.1;10.1.0.0/16;]`, typ)
-		record, err = parseOneRecord(src)
-		require.NoError(t, err)
 
 		testError(t, "x = s", record, expr.ErrIncompatibleTypes, "comparing integer and string")
 		testError(t, "x != s", record, expr.ErrIncompatibleTypes, "comparing integer and string")
@@ -324,10 +264,9 @@ func TestCompareNumbers(t *testing.T) {
 
 	// Test comparison between signed and unsigned and also
 	// floats that cast to different integers.
-	rec2, err := parseOneRecord(`
+	rec2 := `
 #0:record[i:int64,u:uint64,f:float64]
-0:[-1;18446744073709551615;-1.0;]`)
-	require.NoError(t, err)
+0:[-1;18446744073709551615;-1.0;]`
 	testSuccessful(t, "i = u", rec2, zbool(false))
 	testSuccessful(t, "i != u", rec2, zbool(true))
 	testSuccessful(t, "i < u", rec2, zbool(true))
@@ -358,11 +297,10 @@ func TestCompareNumbers(t *testing.T) {
 }
 
 func TestCompareNonNumbers(t *testing.T) {
-	record, err := parseOneRecord(`
+	record := `
 #port=uint16
 #0:record[b:bool,s:string,bs:bstring,i:ip,p:port,net:net,t:time,d:duration]
-0:[t;hello;world;10.1.1.1;443;10.1.0.0/16;1583794452;1000;]`)
-	require.NoError(t, err)
+0:[t;hello;world;10.1.1.1;443;10.1.0.0/16;1583794452;1000;]`
 
 	// bool
 	testSuccessful(t, "b = true", record, zbool(true))
@@ -428,10 +366,9 @@ func TestCompareNonNumbers(t *testing.T) {
 	}
 
 	// relative comparisons on strings
-	record, err = parseOneRecord(`
+	record = `
 #0:record[s:string,bs:bstring]
-0:[abc;def;]`)
-	require.NoError(t, err)
+0:[abc;def;]`
 
 	testSuccessful(t, `s < "brim"`, record, zbool(true))
 	testSuccessful(t, `s < "aaa"`, record, zbool(false))
@@ -467,19 +404,18 @@ func TestCompareNonNumbers(t *testing.T) {
 }
 
 func TestPattern(t *testing.T) {
-	testSuccessful(t, `"abc" = "abc"`, nil, zbool(true))
-	testSuccessful(t, `"abc" != "abc"`, nil, zbool(false))
-	testSuccessful(t, "10.1.1.1 in 10.0.0.0/8", nil, zbool(true))
-	testSuccessful(t, "10.1.1.1 in 192.168.0.0/16", nil, zbool(false))
-	testSuccessful(t, "!(10.1.1.1 in 10.0.0.0/8)", nil, zbool(false))
-	testSuccessful(t, "!(10.1.1.1 in 192.168.0.0/16)", nil, zbool(true))
+	testSuccessful(t, `"abc" = "abc"`, "", zbool(true))
+	testSuccessful(t, `"abc" != "abc"`, "", zbool(false))
+	testSuccessful(t, "10.1.1.1 in 10.0.0.0/8", "", zbool(true))
+	testSuccessful(t, "10.1.1.1 in 192.168.0.0/16", "", zbool(false))
+	testSuccessful(t, "!(10.1.1.1 in 10.0.0.0/8)", "", zbool(false))
+	testSuccessful(t, "!(10.1.1.1 in 192.168.0.0/16)", "", zbool(true))
 }
 
 func TestIn(t *testing.T) {
-	record, err := parseOneRecord(`
+	record := `
 #0:record[a:array[int32],s:set[int32]]
-0:[[1;2;3;][4;5;6;]]`)
-	require.NoError(t, err)
+0:[[1;2;3;][4;5;6;]]`
 
 	testSuccessful(t, "1 in a", record, zbool(true))
 	testSuccessful(t, "0 in a", record, zbool(false))
@@ -493,10 +429,9 @@ func TestIn(t *testing.T) {
 }
 
 func TestArithmetic(t *testing.T) {
-	record, err := parseOneRecord(`
+	record := `
 #0:record[x:int32,f:float64]
-0:[10;2.5;]`)
-	require.NoError(t, err)
+0:[10;2.5;]`
 
 	// Test integer arithmetic
 	testSuccessful(t, "100 + 23", record, zint64(123))
@@ -588,25 +523,22 @@ func TestArithmetic(t *testing.T) {
 	var intTypes = []string{"int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64"}
 	for _, t1 := range intTypes {
 		for _, t2 := range intTypes {
-			record, err = parseOneRecord(fmt.Sprintf(`
+			record := fmt.Sprintf(`
 #0:record[a:%s,b:%s]
-0:[4;2;]`, t1, t2))
-			require.NoError(t, err)
-
+0:[4;2;]`, t1, t2)
 			testSuccessful(t, "a + b", record, iresult(t1, t2, 6))
 			testSuccessful(t, "b + a", record, iresult(t1, t2, 6))
 			testSuccessful(t, "a - b", record, iresult(t1, t2, 2))
 			testSuccessful(t, "a * b", record, iresult(t1, t2, 8))
 			testSuccessful(t, "b * a", record, iresult(t1, t2, 8))
 			testSuccessful(t, "a / b", record, iresult(t1, t2, 2))
-			testSuccessful(t, "b / a", record, iresult(t1, t2, 0), t1+t2)
+			testSuccessful(t, "b / a", record, iresult(t1, t2, 0))
 		}
 
 		// Test arithmetic mixing float + int
-		record, err = parseOneRecord(fmt.Sprintf(`
+		record = fmt.Sprintf(`
 #0:record[x:%s,f:float64]
-0:[10;2.5;]`, t1))
-		require.NoError(t, err)
+0:[10;2.5;]`, t1)
 
 		testSuccessful(t, "f + 5", record, zfloat64(7.5))
 		testSuccessful(t, "5 + f", record, zfloat64(7.5))
@@ -634,10 +566,9 @@ func TestArithmetic(t *testing.T) {
 }
 
 func TestArrayIndex(t *testing.T) {
-	record, err := parseOneRecord(`
+	record := `
 #0:record[x:array[int64],i:uint16]
-0:[[1;2;3;]1;]`)
-	require.NoError(t, err)
+0:[[1;2;3;]1;]`
 
 	testSuccessful(t, "x[0]", record, zint64(1))
 	testSuccessful(t, "x[1]", record, zint64(2))
@@ -651,23 +582,19 @@ func TestArrayIndex(t *testing.T) {
 }
 
 func TestFieldReference(t *testing.T) {
-	record, err := parseOneRecord(`
+	record := `
 #0:record[rec:record[i:int32,s:string,f:float64]]
-0:[[5;boo;6.1;]]`)
-	require.NoError(t, err)
+0:[[5;boo;6.1;]]`
 
 	testSuccessful(t, "rec.i", record, zint32(5))
 	testSuccessful(t, "rec.s", record, zstring("boo"))
 	testSuccessful(t, "rec.f", record, zfloat64(6.1))
-
-	testError(t, "rec.no", record, zng.ErrMissing, "referencing nonexistent field")
 }
 
 func TestConditional(t *testing.T) {
-	record, err := parseOneRecord(`
+	record := `
 #0:record[x:int64]
-0:[1;]`)
-	require.NoError(t, err)
+0:[1;]`
 
 	testSuccessful(t, `x = 0 ? "zero" : "not zero"`, record, zstring("not zero"))
 	testSuccessful(t, `x = 1 ? "one" : "not one"`, record, zstring("one"))
@@ -681,67 +608,67 @@ func TestConditional(t *testing.T) {
 
 func a(t *testing.T) {
 	// Test casts to byte
-	testSuccessful(t, "10 :uint8", nil, zng.Value{zng.TypeUint8, zng.EncodeUint(10)})
-	testError(t, "-1 :uint8", nil, expr.ErrBadCast, "out of range cast to uint8")
-	testError(t, "300 :uint8", nil, expr.ErrBadCast, "out of range cast to uint8")
-	testError(t, `"foo" :uint8"`, nil, expr.ErrBadCast, "cannot cast incompatible type to uint8")
+	testSuccessful(t, "10 :uint8", "", zng.Value{zng.TypeUint8, zng.EncodeUint(10)})
+	testError(t, "-1 :uint8", "", expr.ErrBadCast, "out of range cast to uint8")
+	testError(t, "300 :uint8", "", expr.ErrBadCast, "out of range cast to uint8")
+	testError(t, `"foo" :uint8"`, "", expr.ErrBadCast, "cannot cast incompatible type to uint8")
 
 	// Test casts to int16
-	testSuccessful(t, "10 :int16", nil, zng.Value{zng.TypeInt16, zng.EncodeInt(10)})
-	testError(t, "-33000 :int16", nil, expr.ErrBadCast, "out of range cast to int16")
-	testError(t, "33000 :int16", nil, expr.ErrBadCast, "out of range cast to int16")
-	testError(t, `"foo" :int16"`, nil, expr.ErrBadCast, "cannot cast incompatible type to int16")
+	testSuccessful(t, "10 :int16", "", zng.Value{zng.TypeInt16, zng.EncodeInt(10)})
+	testError(t, "-33000 :int16", "", expr.ErrBadCast, "out of range cast to int16")
+	testError(t, "33000 :int16", "", expr.ErrBadCast, "out of range cast to int16")
+	testError(t, `"foo" :int16"`, "", expr.ErrBadCast, "cannot cast incompatible type to int16")
 
 	// Test casts to uint16
-	testSuccessful(t, "10 :uint16", nil, zng.Value{zng.TypeUint16, zng.EncodeUint(10)})
-	testError(t, "-1 :uint16", nil, expr.ErrBadCast, "out of range cast to uint16")
-	testError(t, "66000 :uint16", nil, expr.ErrBadCast, "out of range cast to uint16")
-	testError(t, `"foo" :uint16"`, nil, expr.ErrBadCast, "cannot cast incompatible type to uint16")
+	testSuccessful(t, "10 :uint16", "", zng.Value{zng.TypeUint16, zng.EncodeUint(10)})
+	testError(t, "-1 :uint16", "", expr.ErrBadCast, "out of range cast to uint16")
+	testError(t, "66000 :uint16", "", expr.ErrBadCast, "out of range cast to uint16")
+	testError(t, `"foo" :uint16"`, "", expr.ErrBadCast, "cannot cast incompatible type to uint16")
 
 	// Test casts to int32
-	testSuccessful(t, "10 :int32", nil, zng.Value{zng.TypeInt32, zng.EncodeInt(10)})
-	testError(t, "-2200000000 :int32", nil, expr.ErrBadCast, "out of range cast to int32")
-	testError(t, "2200000000 :int32", nil, expr.ErrBadCast, "out of range cast to int32")
-	testError(t, `"foo" :int32"`, nil, expr.ErrBadCast, "cannot cast incompatible type to int32")
+	testSuccessful(t, "10 :int32", "", zng.Value{zng.TypeInt32, zng.EncodeInt(10)})
+	testError(t, "-2200000000 :int32", "", expr.ErrBadCast, "out of range cast to int32")
+	testError(t, "2200000000 :int32", "", expr.ErrBadCast, "out of range cast to int32")
+	testError(t, `"foo" :int32"`, "", expr.ErrBadCast, "cannot cast incompatible type to int32")
 
 	// Test casts to uint32
-	testSuccessful(t, "10 :uint32", nil, zng.Value{zng.TypeUint32, zng.EncodeUint(10)})
-	testError(t, "-1 :uint32", nil, expr.ErrBadCast, "out of range cast to uint32")
-	testError(t, "4300000000 :uint8", nil, expr.ErrBadCast, "out of range cast to uint32")
-	testError(t, `"foo" :uint32"`, nil, expr.ErrBadCast, "cannot cast incompatible type to uint32")
+	testSuccessful(t, "10 :uint32", "", zng.Value{zng.TypeUint32, zng.EncodeUint(10)})
+	testError(t, "-1 :uint32", "", expr.ErrBadCast, "out of range cast to uint32")
+	testError(t, "4300000000 :uint8", "", expr.ErrBadCast, "out of range cast to uint32")
+	testError(t, `"foo" :uint32"`, "", expr.ErrBadCast, "cannot cast incompatible type to uint32")
 
 	// Test casts to uint64
-	testSuccessful(t, "10 :uint64", nil, zuint64(10))
-	testError(t, "-1 :uint64", nil, expr.ErrBadCast, "out of range cast to uint64")
-	testError(t, `"foo" :uint64"`, nil, expr.ErrBadCast, "cannot cast incompatible type to uint64")
+	testSuccessful(t, "10 :uint64", "", zuint64(10))
+	testError(t, "-1 :uint64", "", expr.ErrBadCast, "out of range cast to uint64")
+	testError(t, `"foo" :uint64"`, "", expr.ErrBadCast, "cannot cast incompatible type to uint64")
 
 	// Test casts to float64
-	testSuccessful(t, "10 :float64", nil, zfloat64(10))
-	testError(t, `"foo" :float64"`, nil, expr.ErrBadCast, "cannot cast incompatible type to float64")
+	testSuccessful(t, "10 :float64", "", zfloat64(10))
+	testError(t, `"foo" :float64"`, "", expr.ErrBadCast, "cannot cast incompatible type to float64")
 
 	// Test casts to ip
-	testSuccessful(t, `"1.2.3.4" :ip`, nil, zip(t, "1.2.3.4"))
-	testError(t, "1234 :ip", nil, expr.ErrBadCast, "cast of invalid ip address fails")
-	testError(t, `"not an address" :ip`, nil, expr.ErrBadCast, "cast of invalid ip address fails")
+	testSuccessful(t, `"1.2.3.4" :ip`, "", zip(t, "1.2.3.4"))
+	testError(t, "1234 :ip", "", expr.ErrBadCast, "cast of invalid ip address fails")
+	testError(t, `"not an address" :ip`, "", expr.ErrBadCast, "cast of invalid ip address fails")
 
 	// Test casts to time
 	ts := zng.Value{zng.TypeTime, zng.EncodeTime(nano.Ts(1589126400_000_000_000))}
-	testSuccessful(t, "1589126400.0 :time", nil, ts)
-	testSuccessful(t, "1589126400 :time", nil, ts)
-	testError(t, `"1234" :time`, nil, expr.ErrBadCast, "cannot cast string to time")
+	testSuccessful(t, "1589126400.0 :time", "", ts)
+	testSuccessful(t, "1589126400 :time", "", ts)
+	testError(t, `"1234" :time`, "", expr.ErrBadCast, "cannot cast string to time")
 }
 
 func TestCasts(t *testing.T) {
-	testSuccessful(t, "1.2:string", nil, zstring("1.2"))
-	testSuccessful(t, "5:string", nil, zstring("5"))
-	testSuccessful(t, "1.2.3.4:string", nil, zstring("1.2.3.4"))
-	testSuccessful(t, `"1":int64`, nil, zint64(1))
-	testSuccessful(t, `"-1":int64`, nil, zint64(-1))
-	testSuccessful(t, `"5.5":float64`, nil, zfloat64(5.5))
-	testSuccessful(t, `"1.2.3.4":ip`, nil, zaddr("1.2.3.4"))
+	testSuccessful(t, "1.2:string", "", zstring("1.2"))
+	testSuccessful(t, "5:string", "", zstring("5"))
+	testSuccessful(t, "1.2.3.4:string", "", zstring("1.2.3.4"))
+	testSuccessful(t, `"1":int64`, "", zint64(1))
+	testSuccessful(t, `"-1":int64`, "", zint64(-1))
+	testSuccessful(t, `"5.5":float64`, "", zfloat64(5.5))
+	testSuccessful(t, `"1.2.3.4":ip`, "", zaddr("1.2.3.4"))
 
-	testError(t, "1:ip", nil, expr.ErrBadCast, "ip cast non-ip arg")
-	testError(t, `"abc":int64`, nil, expr.ErrBadCast, "int64 cast with non-parseable string")
-	testError(t, `"abc":float64`, nil, expr.ErrBadCast, "float64 cast with non-parseable string")
-	testError(t, `"abc":ip`, nil, expr.ErrBadCast, "ip cast with non-parseable string")
+	testError(t, "1:ip", "", expr.ErrBadCast, "ip cast non-ip arg")
+	testError(t, `"abc":int64`, "", expr.ErrBadCast, "int64 cast with non-parseable string")
+	testError(t, `"abc":float64`, "", expr.ErrBadCast, "float64 cast with non-parseable string")
+	testError(t, `"abc":ip`, "", expr.ErrBadCast, "ip cast with non-parseable string")
 }

@@ -1,0 +1,18 @@
+script: ast -C -P 2 -sortKey ts "* | cut ts, y, z | put x=y | rename y=z"
+
+outputs:
+  - name: stdout
+    data: |
+      split (
+        =>
+          filter *
+          | cut ts=ts,y=y,z=z
+          | put x=y
+          | rename y=z
+        =>
+          filter *
+          | cut ts=ts,y=y,z=z
+          | put x=y
+          | rename y=z
+      ) merge-by ts
+      | pass

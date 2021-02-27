@@ -1,0 +1,20 @@
+script: ast -C -P 2 -sortKey ts "* | put x=y | countdistinct(x) by y | uniq"
+
+outputs:
+  - name: stdout
+    data: |
+      split (
+        =>
+          filter *
+          | put x=y
+          | summarize partials-out
+              countdistinct=countdistinct(x) by y=y
+        =>
+          filter *
+          | put x=y
+          | summarize partials-out
+              countdistinct=countdistinct(x) by y=y
+      )
+      | summarize partials-in
+          countdistinct=countdistinct(x) by y=y
+      | uniq

@@ -58,7 +58,7 @@ func (d *debug) exprs(exprs []ast.Expression) {
 func (d *debug) expr(e ast.Expression) {
 	switch e := e.(type) {
 	case nil:
-		d.write("(nil)")
+		d.write("(null)")
 	case *ast.Reducer:
 		d.open(e.Operator)
 		d.expr(e.Expr)
@@ -68,8 +68,6 @@ func (d *debug) expr(e ast.Expression) {
 			d.close()
 		}
 		d.close()
-	case *ast.Empty:
-		d.write("(empty)")
 	case *ast.Literal:
 		d.open("literal ")
 		d.write(e.Type)

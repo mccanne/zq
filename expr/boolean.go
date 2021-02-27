@@ -230,15 +230,23 @@ func CompareBstring(op string, pattern zng.Bstring) (Boolean, error) {
 	}, nil
 }
 
-// compareRegexp returns a Predicate that compares values that must
-// be a string or enum with the value's regular expression using a regex
-// match comparison based on equality or inequality based on op.
-func compareRegexp(op, pattern string) (Boolean, error) {
+func CheckRegexp(pattern string) (*regexp.Regexp, error) {
 	re, err := regexp.Compile(string(zng.UnescapeBstring([]byte(pattern))))
 	if err != nil {
 		if syntaxErr, ok := err.(*syntax.Error); ok {
 			syntaxErr.Expr = pattern
 		}
+		return nil, err
+	}
+	return re, err
+}
+
+// compareRegexp returns a Predicate that compares values that must
+// be a string or enum with the value's regular expression using a regex
+// match comparison based on equality or inequality based on op.
+func compareRegexp(op, pattern string) (Boolean, error) {
+	re, err := CheckRegexp(pattern)
+	if err != nil {
 		return nil, err
 	}
 	switch op {

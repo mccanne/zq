@@ -40,7 +40,7 @@ func NewWorkerOp(ctx context.Context, req api.WorkerChunkRequest, st storage.Sto
 	if err != nil {
 		return nil, zqe.ErrInvalid("invalid worker op request: %w", err)
 	}
-	proc, err := ast.UnpackJSON(req.Proc)
+	proc, err := ast.UnpackJSONAsProc(req.Proc)
 	if err != nil {
 		return nil, err
 	}

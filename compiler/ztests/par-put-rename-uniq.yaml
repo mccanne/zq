@@ -1,0 +1,16 @@
+script: ast -C -P 2 -sortKey ts "* | put x=foo | rename foo=boo | uniq"
+
+outputs:
+  - name: stdout
+    data: |
+      split (
+        =>
+          filter *
+          | put x=foo
+          | rename foo=boo
+        =>
+          filter *
+          | put x=foo
+          | rename foo=boo
+      ) merge-by ts
+      | uniq

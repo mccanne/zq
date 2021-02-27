@@ -3,13 +3,9 @@ package semantic
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/brimsec/zq/compiler/ast"
-	"github.com/brimsec/zq/compiler/kernel"
-	"github.com/brimsec/zq/expr/agg"
 	"github.com/brimsec/zq/field"
-	"github.com/brimsec/zq/zng/resolver"
 )
 
 var passProc = &ast.PassProc{Op: "PassProc"}
@@ -20,21 +16,6 @@ func zbufDirInt(reversed bool) int {
 		return -1
 	}
 	return 1
-}
-
-func Optimize(zctx *resolver.Context, program ast.Proc, sortKey field.Static, sortReversed bool) (*kernel.Filter, ast.Proc) {
-	if program == nil {
-		return nil, passProc
-	}
-	Transform(program)
-	if sortKey != nil {
-		SetGroupByProcInputSortDir(program, sortKey, zbufDirInt(sortReversed))
-	}
-	fe, p := liftFilter(program)
-	if fe == nil {
-		return nil, p
-	}
-	return kernel.NewFilter(zctx, fe), p
 }
 
 func ensureSequentialProc(p ast.Proc) *ast.SequentialProc {
@@ -70,18 +51,15 @@ func liftFilter(p ast.Proc) (ast.Expression, ast.Proc) {
 	seq, ok := p.(*ast.SequentialProc)
 	if ok && len(seq.Procs) > 0 {
 		nc := countConsts(seq.Procs)
-		if nc == len(seq.Procs) {
-			return nil, p
+		if nc != 0 {
+			panic("internal error: consts should have been removed from AST")
 		}
-		if fp, ok := seq.Procs[nc].(*ast.FilterProc); ok {
+		if fp, ok := seq.Procs[0].(*ast.FilterProc); ok {
 			rest := ast.Proc(passProc)
-			if len(seq.Procs) > nc+1 {
-				var procs []ast.Proc
-				procs = append(procs, seq.Procs[0:nc]...)
-				procs = append(procs, seq.Procs[nc+1:]...)
+			if len(seq.Procs) > 1 {
 				rest = &ast.SequentialProc{
 					Op:    "SequentialProc",
-					Procs: procs,
+					Procs: seq.Procs[1:],
 				}
 			}
 			return fp.Filter, rest
@@ -90,107 +68,19 @@ func liftFilter(p ast.Proc) (ast.Expression, ast.Proc) {
 	return nil, p
 }
 
-// Transform does a semantic analysis on a flowgraph to an
-// intermediate representation that can be compiled into the runtime
-// object.  Currently, it only replaces the group-by duration with
-// a truncation call on the ts and replaces FunctionCall's in proc context
-// with either a group-by or filter-proc based on the function's name.
-// XXX In a subsequent PR, instead of modifed the AST in place we will
-// translate the AST into a flow DSL.
-func Transform(p ast.Proc) (ast.Proc, error) {
-	switch p := p.(type) {
-	case *ast.GroupByProc:
-		if duration := p.Duration.Seconds; duration != 0 {
-			durationKey := ast.Assignment{
-				Op:  "Assignment",
-				LHS: ast.NewDotExpr(field.New("ts")),
-				RHS: &ast.FunctionCall{
-					Op:       "FunctionCall",
-					Function: "trunc",
-					Args: []ast.Expression{
-						ast.NewDotExpr(field.New("ts")),
-						&ast.Literal{
-							Op:    "Literal",
-							Type:  "int64",
-							Value: strconv.Itoa(duration),
-						}},
-				},
-			}
-			p.Keys = append([]ast.Assignment{durationKey}, p.Keys...)
-		}
-	case *ast.ParallelProc:
-		for k := range p.Procs {
-			var err error
-			p.Procs[k], err = Transform(p.Procs[k])
-			if err != nil {
-				return nil, err
-			}
-		}
-	case *ast.SequentialProc:
-		for k := range p.Procs {
-			var err error
-			p.Procs[k], err = Transform(p.Procs[k])
-			if err != nil {
-				return nil, err
-			}
-		}
-	case *ast.SwitchProc:
-		for k := range p.Cases {
-			var err error
-			tr, err := Transform(p.Cases[k].Proc)
-			if err != nil {
-				return nil, err
-			}
-			p.Cases[k] = ast.SwitchCase{Filter: p.Cases[k].Filter, Proc: tr}
-		}
-	case *ast.FunctionCall:
-		converted, err := convertFunctionProc(p)
-		if err != nil {
-			return nil, err
-		}
-		// The conversion may be a group-by so we recursively
-		// invoke the transformation here...
-		return Transform(converted)
-	}
-	return p, nil
-}
+// all fields should be turned into field paths by initial semantic pass
 
-// convertFunctionProc converts a FunctionCall ast node at proc level
-// to a group-by or a filter-proc based on the name of the function.
-// This way, Z of the form `... | exists(...) | ...` can be distinguished
-// from `count()` by the name lookup here at compile time.
-func convertFunctionProc(call *ast.FunctionCall) (ast.Proc, error) {
-	if _, err := agg.NewPattern(call.Function); err != nil {
-		// Assume it's a valid function and convert.  If not,
-		// the compiler will report an unknown function error.
-		return ast.FilterToProc(call), nil
+func exprToField(e ast.Expression) field.Static {
+	f, ok := e.(*ast.FieldPath)
+	if !ok {
+		return nil
 	}
-	var e ast.Expression
-	if len(call.Args) > 1 {
-		return nil, fmt.Errorf("%s: wrong number of arguments", call.Function)
-	}
-	if len(call.Args) == 1 {
-		e = call.Args[0]
-	}
-	reducer := &ast.Reducer{
-		Op:       "Reducer",
-		Operator: call.Function,
-		Expr:     e,
-	}
-	return &ast.GroupByProc{
-		Op: "GroupByProc",
-		Reducers: []ast.Assignment{
-			{
-				Op:  "Assignment",
-				RHS: reducer,
-			},
-		},
-	}, nil
+	return f.Name
 }
 
 func eq(e ast.Expression, b field.Static) bool {
-	a, ok := ast.DotExprToField(e)
-	if !ok {
+	a := exprToField(e)
+	if a == nil {
 		return false
 	}
 	return a.Equal(b)
@@ -234,8 +124,8 @@ func SetGroupByProcInputSortDir(p ast.Proc, inputSortField field.Static, inputSo
 		// Set p.InputSortDir and return true if the first grouping key
 		// is inputSortField or an order-preserving function of it.
 		if len(p.Keys) > 0 && eq(p.Keys[0].LHS, inputSortField) {
-			rhs, ok := ast.DotExprToField(p.Keys[0].RHS)
-			if ok && rhs.Equal(inputSortField) {
+			rhs := exprToField(p.Keys[0].RHS)
+			if rhs != nil && rhs.Equal(inputSortField) {
 				p.InputSortDir = inputSortDir
 				return true
 			}
@@ -245,8 +135,8 @@ func SetGroupByProcInputSortDir(p ast.Proc, inputSortField field.Static, inputSo
 					if len(expr.Args) == 0 {
 						return false
 					}
-					arg0, ok := ast.DotExprToField(expr.Args[0])
-					if ok && arg0.Equal(inputSortField) {
+					arg0 := exprToField(expr.Args[0])
+					if arg0 != nil && arg0.Equal(inputSortField) {
 						p.InputSortDir = inputSortDir
 						return true
 					}
@@ -256,8 +146,8 @@ func SetGroupByProcInputSortDir(p ast.Proc, inputSortField field.Static, inputSo
 		return false
 	case *ast.PutProc:
 		for _, c := range p.Clauses {
-			lhs, ok := ast.DotExprToField(c.LHS)
-			if ok && lhs.Equal(inputSortField) {
+			lhs := exprToField(c.LHS)
+			if lhs != nil && lhs.Equal(inputSortField) {
 				return false
 			}
 		}
@@ -285,11 +175,14 @@ func copyProcs(ps []ast.Proc) []ast.Proc {
 }
 
 func copyProc(p ast.Proc) ast.Proc {
+	if p == nil {
+		panic("copyProc nil")
+	}
 	b, err := json.Marshal(p)
 	if err != nil {
 		panic(err)
 	}
-	copy, err := ast.UnpackJSON(b)
+	copy, err := ast.UnpackJSONAsProc(b)
 	if err != nil {
 		panic(err)
 	}
@@ -327,18 +220,11 @@ func buildSplitFlowgraph(branch, tail []ast.Proc, mergeField field.Static, rever
 	}, true
 }
 
-// IsParallelizable reports whether Parallelize can parallelize p when called
-// with the same arguments.
-func IsParallelizable(p ast.Proc, inputSortField field.Static, inputSortReversed bool) bool {
-	_, ok := Parallelize(copyProc(p), 0, inputSortField, inputSortReversed)
-	return ok
-}
+func parallelize(p ast.Proc, N int, inputSortField field.Static, inputSortReversed bool) (*ast.SequentialProc, bool) {
+	if p == nil {
+		panic("parallelize nil")
+	}
 
-// Parallelize takes a sequential proc AST and tries to
-// parallelize it by splitting as much as possible of the sequence
-// into N parallel branches. The boolean return argument indicates
-// whether the flowgraph could be parallelized.
-func Parallelize(p ast.Proc, N int, inputSortField field.Static, inputSortReversed bool) (*ast.SequentialProc, bool) {
 	seq := ensureSequentialProc(p)
 	orderSensitiveTail := true
 	for i := range seq.Procs {
@@ -368,12 +254,12 @@ func Parallelize(p ast.Proc, N int, inputSortField field.Static, inputSortRevers
 			}
 			var found bool
 			for _, f := range fields {
-				fieldName, okField := ast.DotExprToField(f.RHS)
-				lhs, okLHS := ast.DotExprToField(f.LHS)
-				if okField && !fieldName.Equal(inputSortField) && okLHS && lhs.Equal(inputSortField) {
+				fieldName := exprToField(f.RHS)
+				lhs := exprToField(f.LHS)
+				if fieldName != nil && !fieldName.Equal(inputSortField) && lhs.Equal(inputSortField) {
 					return buildSplitFlowgraph(seq.Procs[0:i], seq.Procs[i:], inputSortField, inputSortReversed, N)
 				}
-				if okField && fieldName.Equal(inputSortField) && lhs == nil {
+				if fieldName != nil && fieldName.Equal(inputSortField) && (lhs == nil || lhs.Equal(inputSortField)) {
 					found = true
 				}
 			}
@@ -428,8 +314,8 @@ func Parallelize(p ast.Proc, N int, inputSortField field.Static, inputSortRevers
 			dir := map[int]bool{-1: true, 1: false}[p.SortDir]
 			if len(p.Fields) == 1 {
 				// Single sort field: we can sort in each parallel branch, and then do an ordered merge.
-				mergeField, ok := ast.DotExprToField(p.Fields[0])
-				if !ok {
+				mergeField := exprToField(p.Fields[0])
+				if mergeField == nil {
 					return seq, false
 				}
 				return buildSplitFlowgraph(seq.Procs[0:i+1], seq.Procs[i+1:], mergeField, dir, N)
@@ -461,7 +347,7 @@ func Parallelize(p ast.Proc, N int, inputSortField field.Static, inputSortRevers
 		case *ast.JoinProc:
 			return seq, false
 		default:
-			panic("proc type not handled")
+			panic(fmt.Sprintf("proc type not handled: %T", p))
 		}
 	}
 	// If we're here, we reached the end of the flowgraph without

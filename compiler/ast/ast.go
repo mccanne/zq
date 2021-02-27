@@ -29,13 +29,20 @@ type Identifier struct {
 	Name string `json:"name"`
 }
 
+//XXX field path with empty name is root record
+type FieldPath struct {
+	Op   string   `json:"op" unpack:""`
+	Name []string `json:"name"`
+}
+
+type Ref struct {
+	Op   string `json:"op" unpack:""`
+	Name string `json:"name"`
+}
+
 // RootRecord refers to the outer record being operated upon.  Field accesses
 // typically begin with the LHS of a "." expression set to a RootRecord.
 type RootRecord struct {
-	Op string `json:"op" unpack:""`
-}
-
-type Empty struct {
 	Op string `json:"op" unpack:""`
 }
 
@@ -78,8 +85,9 @@ type BinaryExpression struct {
 }
 
 type SelectExpression struct {
-	Op        string       `json:"op" unpack:"SelectExpr"`
-	Selectors []Expression `json:"selectors"`
+	Op        string         `json:"op" unpack:"SelectExpr"`
+	Selectors []Expression   `json:"selectors"`
+	Methods   []FunctionCall `json:"methods"`
 }
 
 type ConditionalExpression struct {
@@ -123,10 +131,12 @@ func (*CastExpression) exprNode()        {}
 func (*TypeExpr) exprNode()              {}
 func (*Literal) exprNode()               {}
 func (*Identifier) exprNode()            {}
+func (*FieldPath) exprNode()             {}
+func (*Ref) exprNode()                   {}
 func (*RootRecord) exprNode()            {}
-func (*Empty) exprNode()                 {}
 func (*Assignment) exprNode()            {}
 func (*Reducer) exprNode()               {}
+func (*SeqExpr) exprNode()               {}
 
 // ----------------------------------------------------------------------------
 // Procs
@@ -305,6 +315,18 @@ type (
 	}
 )
 
+type SeqExpr struct {
+	Op        string       `json:"op" unpack:""`
+	Name      string       `json:"name"`
+	Selectors []Expression `json:"selectors"`
+	Methods   []Method     `json:"methods"`
+}
+
+type Method struct {
+	Name string       `json:"name"`
+	Args []Expression `json:"args"`
+}
+
 type SwitchCase struct {
 	Filter Expression `json:"filter"`
 	Proc   Proc       `json:"proc"`
@@ -378,52 +400,51 @@ type Reducer struct {
 	Where    Expression `json:"where"`
 }
 
-func DotExprToField(n Expression) (field.Static, bool) {
-	switch n := n.(type) {
-	case nil:
-		return nil, true
+func DotExprToFieldPath(e Expression) *FieldPath {
+	switch e := e.(type) {
 	case *BinaryExpression:
-		if n.Operator == "." || n.Operator == "[" {
-			lhs, ok := DotExprToField(n.LHS)
-			if !ok {
-				return nil, false
+		if e.Operator == "." {
+			lhs := DotExprToFieldPath(e.LHS)
+			if lhs == nil {
+				return nil
 			}
-			rhs, ok := DotExprToField(n.RHS)
+			id, ok := e.RHS.(*Identifier)
 			if !ok {
-				return nil, false
+				return nil
 			}
-			return append(lhs, rhs...), true
+			lhs.Name = append(lhs.Name, id.Name)
+			return lhs
+		}
+		if e.Operator == "[" {
+			lhs := DotExprToFieldPath(e.LHS)
+			if lhs == nil {
+				return nil
+			}
+			id, ok := e.RHS.(*Literal)
+			if !ok || id.Type != "string" {
+				return nil
+			}
+			lhs.Name = append(lhs.Name, id.Value)
+			return lhs
 		}
 	case *Identifier:
-		return field.Static{n.Name}, true
-	case *RootRecord, *Empty:
-		return nil, true
+		return &FieldPath{Op: "FieldPath", Name: []string{e.Name}}
+	case *RootRecord:
+		return &FieldPath{Op: "FieldPath", Name: []string{}}
 	}
-	return nil, false
+	// This includes a null Expr, which can happen if the AST is missing
+	// a field or sets it to null.
+	return nil
 }
 
 func FieldsOf(e Expression) []field.Static {
 	switch e := e.(type) {
 	default:
-		f, _ := DotExprToField(e)
-		if f == nil {
-			return nil
+		f := DotExprToFieldPath(e)
+		if f != nil {
+			return []field.Static{f.Name}
 		}
-		return []field.Static{f}
-	case *BinaryExpression:
-		if e.Operator == "." || e.Operator == "[" {
-			lhs, _ := DotExprToField(e.LHS)
-			rhs, _ := DotExprToField(e.RHS)
-			var fields []field.Static
-			if lhs != nil {
-				fields = append(fields, lhs)
-			}
-			if rhs != nil {
-				fields = append(fields, rhs)
-			}
-			return fields
-		}
-		return append(FieldsOf(e.LHS), FieldsOf(e.RHS)...)
+		return nil
 	case *Assignment:
 		return append(FieldsOf(e.LHS), FieldsOf(e.RHS)...)
 	case *SelectExpression:
@@ -487,4 +508,8 @@ func FilterToProc(e Expression) *FilterProc {
 		Op:     "FilterProc",
 		Filter: e,
 	}
+}
+
+func (f *FieldPath) String() string {
+	return field.Static(f.Name).String()
 }

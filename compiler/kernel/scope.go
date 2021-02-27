@@ -9,7 +9,7 @@ type Scope struct {
 	stack []Binder
 }
 
-func newScope() *Scope {
+func NewScope() *Scope {
 	return &Scope{}
 }
 

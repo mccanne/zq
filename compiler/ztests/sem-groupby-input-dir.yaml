@@ -1,0 +1,8 @@
+script: ast -C -s -sortKey ts "* | every 1h count()"
+
+outputs:
+  - name: stdout
+    data: |
+      filter *
+      | summarize every 1h0m0s sort-dir 1
+          count=count() by ts=trunc(ts, 3600)

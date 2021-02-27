@@ -6,6 +6,11 @@ import (
 	"github.com/brimsec/zq/zng"
 )
 
+//XXX
+func CompileBufferFilter(e ast.Expression) (*expr.BufferFilter, error) {
+	return compileBufferFilter(e)
+}
+
 // compileBufferFilter tries to return a BufferFilter for e such that the
 // BufferFilter's Eval method returns true for any byte slice containing the ZNG
 // encoding of a record matching e. (It may also return true for some byte
@@ -13,7 +18,7 @@ import (
 // error if it cannot construct a useful filter.
 func compileBufferFilter(e ast.Expression) (*expr.BufferFilter, error) {
 	switch e := e.(type) {
-	case *ast.FunctionCall:
+	case *ast.SeqExpr:
 		if literal, op, ok := isCompareAny(e); ok && (op == "=" || op == "in") {
 			return newBufferFilterForLiteral(*literal)
 		}
@@ -114,20 +119,16 @@ func isFieldEqualOrIn(e *ast.BinaryExpression) (*ast.Literal, string) {
 	return nil, ""
 }
 
-func isCompareAny(call *ast.FunctionCall) (*ast.Literal, string, bool) {
-	if call.Function != "or" || len(call.Args) != 1 {
-		return nil, "", false
-	}
-	e, ok := call.Args[0].(*ast.BinaryExpression)
-	if !ok || e.Operator != "@" || !isSelectAll(e.LHS) {
+func isCompareAny(seq *ast.SeqExpr) (*ast.Literal, string, bool) {
+	if seq.Name != "or" || len(seq.Methods) != 1 {
 		return nil, "", false
 	}
 	// expression must be a comparison or an in operator
-	apply, ok := e.RHS.(*ast.FunctionCall)
-	if !ok || len(apply.Args) != 1 {
+	method := seq.Methods[0]
+	if len(method.Args) != 1 {
 		return nil, "", false
 	}
-	pred, ok := apply.Args[0].(*ast.BinaryExpression)
+	pred, ok := method.Args[0].(*ast.BinaryExpression)
 	if !ok {
 		return nil, "", false
 	}

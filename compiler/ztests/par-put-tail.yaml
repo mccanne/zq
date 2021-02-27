@@ -1,0 +1,16 @@
+script: ast -C -P 2 -sortKey ts "* | put a=1 | tail"
+
+outputs:
+  - name: stdout
+    data: |
+      split (
+        =>
+          filter *
+          | put a=1
+          | tail 1
+        =>
+          filter *
+          | put a=1
+          | tail 1
+      ) merge-by ts
+      | tail 1
