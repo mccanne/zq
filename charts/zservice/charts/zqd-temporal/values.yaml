@@ -1,0 +1,52 @@
+personality: "temporal"
+replicaCount: 2
+
+postgres:
+  addr: zsrv-postgresql:5432
+  username: "zqd"
+  database: "zqd"
+  # passwordSecretName must have a value called postgres-password
+  passwordSecretName: "postgres"
+
+redis:
+  addr: zsrv-redis-master:6379
+  # passwordSecretName must have a value called redis-password
+  passwordSecretName: "redis"
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 9867
+
+ingress:
+  enabled: false
+
+resources: {}
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

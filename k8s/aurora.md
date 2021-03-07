@@ -115,14 +115,17 @@ kubectl create secret generic aurora \
 ```
 To make sure the secret looks right, try:
 ```
-kubectl get secret aurora --template={{.data.postgresql-password}} | base64 --decode
+kubectl get secret postgres --template="{{ index .data \"postgresql-password\" }}" | base64 --decode
 ```
 Your zqd sessions will connect to the db using this username (not the master username) and the session will have permission to create a database and perform the migrations.
 
 ## Helm Deploy with Aurora
-In order to deploy zqd with Aurora access, you must set an additional environment variable:
+In order to deploy zqd with Aurora access, you must set additional environment variables:
 ```
 ZQD_AURORA_USER=theusername
+ZQD_AURORA_HOST=$(aws rds describe-db-cluster-endpoints \
+		--db-cluster-identifier zq-test-aurora \
+		--output text --query "DBClusterEndpoints[?EndpointType=='WRITER'] | [0].Endpoint"):5432
 ```
 And use this alternate Makefile target to deploy:
 ```

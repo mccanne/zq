@@ -1,0 +1,32 @@
+tag: temporal
+
+env:
+  - AWS_DEFAULT_REGION
+  - AWS_ACCESS_KEY_ID
+  - AWS_SECRET_ACCESS_KEY
+
+script: |
+  exec 2>&1
+  host=localhost:9868
+  space=ZTest_cluster_compact
+  zapi -h $host rm $space &>/dev/null || true
+  # Test assumes a zqd-temporal instance is reachable at port 9868
+  zapi -h $host new -k archivestore $space >/dev/null
+  zapi -h $host -s $space post babble.tzng >/dev/null
+  zapi -h $host -s $space post babble.tzng >/dev/null
+  # Give the Temporal workflow a chance to run.
+  sleep 5
+  data_path=$(zapi -h $host ls -l -f zng | zq -f text "name=\"$space\" | cut data_path" -)
+  zar ls -R $data_path -ranges
+  zapi -h $host rm $space >/dev/null
+
+inputs:
+  - name: babble.tzng
+    source: ../../../../ztests/suite/data/babble.tzng
+  - name: temporal.sh
+
+outputs:
+  - name: stdout
+    data: |
+      [1587518620062237300-1587513611063914690]
+      [1587513592062544400-1587508830068523240]

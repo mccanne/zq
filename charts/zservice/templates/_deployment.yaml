@@ -94,7 +94,7 @@ spec:
               name: spaces-volume
             - mountPath: /tmp
               name: tmp-volume                   
-          {{- if eq .Values.personality "root" }}
+          {{- if or (eq .Values.personality "root") (eq .Values.personality "temporal") }}
             - mountPath: /creds/postgres
               name: postgres-creds-volume
             - mountPath: /creds/redis
@@ -136,7 +136,7 @@ spec:
           emptyDir: {}
         - name: tmp-volume
           emptyDir: {}
-        {{- if eq .Values.personality "root" }}
+        {{- if or (eq .Values.personality "root") (eq .Values.personality "temporal") }}
         - name: postgres-creds-volume
           secret:
             secretName: {{ .Values.global.postgres.passwordSecretName }}

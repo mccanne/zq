@@ -1,5 +1,6 @@
 global:
   AWSRegion: ""
+  datauri: "file:///spaces"
   image:
     repository: "localhost:5000/"
     pullPolicy: Always
@@ -11,6 +12,11 @@ global:
     database: "zqd"
     # passwordSecretName must have a value called postgres-password
     passwordSecretName: "postgres"
+  recruiterAddr: zsrv-recruiter:9867
+  temporal:
+    enabled: false
+    addr: zsrv-temporal-frontend:7233
+    namespace: "zqd-ztest-persistent"
   useCredSecret: false
 
 postgresql:
@@ -55,6 +61,68 @@ root:
 worker:
   recruiterAddr: zsrv-recruiter:9867
 
+temporal:
+  datauri: "file:///spaces"
+  server:
+    config:
+      persistence:
+        default:
+          driver: "sql"
+
+          sql:
+            driver: "postgres"
+            host: _HOST_
+            port: 5432
+            database: temporal
+            user: _USERNAME_
+            password: _PASSWORD_
+            maxConns: 20
+            maxConnLifetime: "1h"
+
+        visibility:
+          driver: "sql"
+
+          sql:
+            driver: "postgres"
+            host: _HOST_
+            port: 5432
+            database: temporal_visibility
+            user: _USERNAME_
+            password: _PASSWORD_
+            maxConns: 20
+            maxConnLifetime: "1h"
+
+  cassandra:
+    enabled: false
+
+  mysql:
+    enabled: false
+
+  postgresql:
+    enabled: true
+
+  schema:
+    setup:
+      enabled: false
+    update:
+      enabled: false
+
+  elasticsearch:
+    enabled: false
+
+  prometheus:
+    enabled: false
+
+  grafana:
+    enabled: false
+
+  kafka:
+    enabled: false
+
+zqd-temporal:
+  enabled: true
+
 tags:
   deploy-postgres: true
   deploy-redis: true
+  deploy-temporal: false

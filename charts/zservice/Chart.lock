@@ -1,9 +1,15 @@
 dependencies:
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
-  version: 10.2.7
+  version: 10.3.11
 - name: redis
   repository: https://charts.bitnami.com/bitnami
   version: 11.3.4
-digest: sha256:2b1653f981d18635499cebdefc6f2b83e573371410dbe02a53bb80f4066c189c
-generated: "2021-02-08T09:32:52.358955-08:00"
+- name: temporal
+  repository: https://brimsec.github.io/helm-chart/
+  version: 0.2.2
+- name: zqd-temporal
+  repository: ""
+  version: 0.1.0
+digest: sha256:30e1204089fa9c8c3095509044b11d9ce071bfd0427ad22fda00360dbb25b09c
+generated: "2021-03-06T23:12:36.419832-08:00"

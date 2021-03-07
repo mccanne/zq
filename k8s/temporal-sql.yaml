@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: temporal-sql
+spec:
+  containers:
+  - name: temporalsql
+    image: $ZQD_ECR_HOST/temporal:1.7.0
+    command: ['sh', '-c', 'echo "Connect to run temporal update" && sleep 3600']

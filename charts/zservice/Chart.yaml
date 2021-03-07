@@ -9,11 +9,22 @@ dependencies:
   - name: postgresql
     repository: https://charts.bitnami.com/bitnami
     version: 10.x.x
-    tags: 
+    tags:
       - deploy-postgres
 
   - name: redis
     repository: https://charts.bitnami.com/bitnami
     version: 11.x.x
-    tags: 
+    tags:
       - deploy-redis
+
+  - name: temporal
+    version: 0.x.x
+    repository: https://brimsec.github.io/helm-chart/
+    tags:
+      - deploy-temporal
+
+  - name: zqd-temporal
+    version: 0.1.0
+    tags:
+      - deploy-temporal
