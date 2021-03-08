@@ -223,7 +223,6 @@ helm-install-with-aurora-temporal:
 	--set temporal.server.config.persistence.visibility.sql.password=$(ZQD_AURORA_PW) \
 	--set temporal.server.config.persistence.visibility.sql.host=$(ZQD_AURORA_HOST)
 
-
 create-release-assets:
 	for os in darwin linux windows; do \
 		zqdir=zq-$(VERSION).$${os}-amd64 ; \

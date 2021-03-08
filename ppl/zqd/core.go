@@ -159,8 +159,6 @@ func NewCore(ctx context.Context, conf Config) (*Core, error) {
 	case "recruiter":
 		c.workerPool = recruiter.NewWorkerPool()
 		c.addRecruiterRoutes()
-	case "temporal":
-		c.addAPIServerRoutes()
 	case "worker":
 		c.addWorkerRoutes()
 	default:

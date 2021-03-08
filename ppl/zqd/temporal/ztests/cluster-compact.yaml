@@ -7,10 +7,9 @@ env:
 
 script: |
   exec 2>&1
-  host=localhost:9868
+  host=localhost:9867 # service endpoint for zqd root
   space=ZTest_cluster_compact
   zapi -h $host rm $space &>/dev/null || true
-  # Test assumes a zqd-temporal instance is reachable at port 9868
   zapi -h $host new -k archivestore $space >/dev/null
   zapi -h $host -s $space post babble.tzng >/dev/null
   zapi -h $host -s $space post babble.tzng >/dev/null
