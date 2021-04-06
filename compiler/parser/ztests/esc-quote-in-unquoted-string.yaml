@@ -1,0 +1,9 @@
+zed: 'foo\"bar'
+
+input: |
+  {s:"foo\"bar"}
+  {s:"foobar"}
+  {s:"\"foobar\""}
+
+output: |
+  {s:"foo\"bar"}

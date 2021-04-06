@@ -13195,13 +13195,19 @@ function peg$parse(input, options) {
       if (peg$silentFails === 0) { peg$fail(peg$c424); }
     }
     if (s0 === peg$FAILED) {
+      s0 = peg$currPos;
       if (input.charCodeAt(peg$currPos) === 34) {
-        s0 = peg$c420;
+        s1 = peg$c420;
         peg$currPos++;
       } else {
-        s0 = peg$FAILED;
+        s1 = peg$FAILED;
         if (peg$silentFails === 0) { peg$fail(peg$c421); }
       }
+      if (s1 !== peg$FAILED) {
+        peg$savedPos = s0;
+        s1 = peg$c87();
+      }
+      s0 = s1;
       if (s0 === peg$FAILED) {
         if (input.charCodeAt(peg$currPos) === 92) {
           s0 = peg$c375;

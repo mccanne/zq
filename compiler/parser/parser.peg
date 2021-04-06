@@ -1241,7 +1241,7 @@ EscapeSequence
 
 SingleCharEscape
   = "'"
-  / "\""
+  / "\"" { RETURN(TEXT) }
   / "\\"
   / "b" { RETURN("\b") }
   / "f" { RETURN("\f") }
