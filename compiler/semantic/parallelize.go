@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/dag"
 	"github.com/brimdata/zed/field"
 )
 
-var passProc = &ast.Pass{Kind: "Pass"}
+var passProc = &dag.Pass{Kind: "Pass"}
 
 //XXX
 func zbufDirInt(reversed bool) int {
@@ -18,20 +18,20 @@ func zbufDirInt(reversed bool) int {
 	return 1
 }
 
-func ensureSequentialProc(p ast.Proc) *ast.Sequential {
-	if p, ok := p.(*ast.Sequential); ok {
+func ensureSequentialProc(p dag.Op) *dag.Sequential {
+	if p, ok := p.(*dag.Sequential); ok {
 		return p
 	}
-	return &ast.Sequential{
-		Kind:  "Sequential",
-		Procs: []ast.Proc{p},
+	return &dag.Sequential{
+		Kind: "Sequential",
+		Ops:  []dag.Op{p},
 	}
 }
 
-func countConsts(procs []ast.Proc) int {
-	for k, p := range procs {
+func countConsts(ops []dag.Op) int {
+	for k, p := range ops {
 		switch p.(type) {
-		case *ast.Const, *ast.TypeProc:
+		case *dag.Const, *dag.TypeProc:
 			continue
 		default:
 			return k
@@ -44,22 +44,22 @@ func countConsts(procs []ast.Proc) int {
 // one is present, and returns its ast.Expression and the modified
 // flowgraph AST. If the flowgraph does not start with a filter, it
 // returns nil and the unmodified flowgraph.
-func liftFilter(p ast.Proc) (ast.Expr, ast.Proc) {
-	if fp, ok := p.(*ast.Filter); ok {
+func liftFilter(p dag.Op) (dag.Expr, dag.Op) {
+	if fp, ok := p.(*dag.Filter); ok {
 		return fp.Expr, passProc
 	}
-	seq, ok := p.(*ast.Sequential)
-	if ok && len(seq.Procs) > 0 {
-		nc := countConsts(seq.Procs)
+	seq, ok := p.(*dag.Sequential)
+	if ok && len(seq.Ops) > 0 {
+		nc := countConsts(seq.Ops)
 		if nc != 0 {
 			panic("internal error: consts should have been removed from AST")
 		}
-		if fp, ok := seq.Procs[0].(*ast.Filter); ok {
-			rest := ast.Proc(passProc)
-			if len(seq.Procs) > 1 {
-				rest = &ast.Sequential{
-					Kind:  "Sequential",
-					Procs: seq.Procs[1:],
+		if fp, ok := seq.Ops[0].(*dag.Filter); ok {
+			rest := dag.Op(passProc)
+			if len(seq.Ops) > 1 {
+				rest = &dag.Sequential{
+					Kind: "Sequential",
+					Ops:  seq.Ops[1:],
 				}
 			}
 			return fp.Expr, rest
@@ -70,15 +70,15 @@ func liftFilter(p ast.Proc) (ast.Expr, ast.Proc) {
 
 // all fields should be turned into field paths by initial semantic pass
 
-func exprToField(e ast.Expr) field.Static {
-	f, ok := e.(*ast.Path)
+func exprToField(e dag.Expr) field.Static {
+	f, ok := e.(*dag.Path)
 	if !ok {
 		return nil
 	}
 	return f.Name
 }
 
-func eq(e ast.Expr, b field.Static) bool {
+func eq(e dag.Expr, b field.Static) bool {
 	a := exprToField(e)
 	if a == nil {
 		return false
@@ -94,9 +94,9 @@ func eq(e ast.Expr, b field.Static) bool {
 // to inputSortDir.  SetGroupByProcInputSortDir returns true if it determines
 // that p's output will remain sorted according to inputSortField and
 // inputSortDir; otherwise, it returns false.
-func SetGroupByProcInputSortDir(p ast.Proc, inputSortField field.Static, inputSortDir int) bool {
+func SetGroupByProcInputSortDir(p dag.Op, inputSortField field.Static, inputSortDir int) bool {
 	switch p := p.(type) {
-	case *ast.Cut:
+	case *dag.Cut:
 		// Return true if the output record contains inputSortField.
 		for _, f := range p.Args {
 			if eq(f.RHS, inputSortField) {
@@ -104,7 +104,7 @@ func SetGroupByProcInputSortDir(p ast.Proc, inputSortField field.Static, inputSo
 			}
 		}
 		return false
-	case *ast.Pick:
+	case *dag.Pick:
 		// Return true if the output record contains inputSortField.
 		for _, f := range p.Args {
 			if eq(f.RHS, inputSortField) {
@@ -112,7 +112,7 @@ func SetGroupByProcInputSortDir(p ast.Proc, inputSortField field.Static, inputSo
 			}
 		}
 		return false
-	case *ast.Drop:
+	case *dag.Drop:
 		// Return true if the output record contains inputSortField.
 		for _, e := range p.Args {
 			if eq(e, inputSortField) {
@@ -120,7 +120,7 @@ func SetGroupByProcInputSortDir(p ast.Proc, inputSortField field.Static, inputSo
 			}
 		}
 		return true
-	case *ast.Summarize:
+	case *dag.Summarize:
 		// Set p.InputSortDir and return true if the first grouping key
 		// is inputSortField or an order-preserving function of it.
 		if len(p.Keys) > 0 && eq(p.Keys[0].LHS, inputSortField) {
@@ -129,7 +129,7 @@ func SetGroupByProcInputSortDir(p ast.Proc, inputSortField field.Static, inputSo
 				p.InputSortDir = inputSortDir
 				return true
 			}
-			if call, ok := p.Keys[0].RHS.(*ast.Call); ok {
+			if call, ok := p.Keys[0].RHS.(*dag.Call); ok {
 				switch call.Name {
 				case "ceil", "floor", "round", "trunc":
 					if len(call.Args) == 0 {
@@ -144,7 +144,7 @@ func SetGroupByProcInputSortDir(p ast.Proc, inputSortField field.Static, inputSo
 			}
 		}
 		return false
-	case *ast.Put:
+	case *dag.Put:
 		for _, c := range p.Args {
 			lhs := exprToField(c.LHS)
 			if lhs != nil && lhs.Equal(inputSortField) {
@@ -152,75 +152,75 @@ func SetGroupByProcInputSortDir(p ast.Proc, inputSortField field.Static, inputSo
 			}
 		}
 		return true
-	case *ast.Sequential:
-		for _, pp := range p.Procs {
+	case *dag.Sequential:
+		for _, pp := range p.Ops {
 			if !SetGroupByProcInputSortDir(pp, inputSortField, inputSortDir) {
 				return false
 			}
 		}
 		return true
-	case *ast.Filter, *ast.Head, *ast.Pass, *ast.Uniq, *ast.Tail, *ast.Fuse, *ast.Const, *ast.TypeProc:
+	case *dag.Filter, *dag.Head, *dag.Pass, *dag.Uniq, *dag.Tail, *dag.Fuse, *dag.Const, *dag.TypeProc:
 		return true
 	default:
 		return false
 	}
 }
 
-func copyProcs(ps []ast.Proc) []ast.Proc {
-	var copies []ast.Proc
-	for _, p := range ps {
-		copies = append(copies, copyProc(p))
+func copyOps(ops []dag.Op) []dag.Op {
+	var copies []dag.Op
+	for _, p := range ops {
+		copies = append(copies, copyOp(p))
 	}
 	return copies
 }
 
-func copyProc(p ast.Proc) ast.Proc {
+func copyOp(p dag.Op) dag.Op {
 	if p == nil {
-		panic("copyProc nil")
+		panic("copyOp nil")
 	}
 	b, err := json.Marshal(p)
 	if err != nil {
 		panic(err)
 	}
-	copy, err := ast.UnpackJSONAsProc(b)
+	copy, err := dag.UnpackJSONAsOp(b)
 	if err != nil {
 		panic(err)
 	}
 	return copy
 }
 
-func buildSplitFlowgraph(branch, tail []ast.Proc, mergeField field.Static, reverse bool, N int) (*ast.Sequential, bool) {
+func buildSplitFlowgraph(branch, tail []dag.Op, mergeField field.Static, reverse bool, N int) (*dag.Sequential, bool) {
 	if len(branch) == 0 {
-		return &ast.Sequential{
-			Kind:  "Sequential",
-			Procs: tail,
+		return &dag.Sequential{
+			Kind: "Sequential",
+			Ops:  tail,
 		}, false
 	}
 	if len(tail) == 0 && mergeField != nil {
 		// Insert a pass tail in order to force a merge of the
 		// parallel branches when compiling. (Trailing parallel branches are wired to
 		// a mux output).
-		tail = []ast.Proc{passProc}
+		tail = []dag.Op{passProc}
 	}
-	pp := &ast.Parallel{
+	pp := &dag.Parallel{
 		Kind:         "Parallel",
-		Procs:        []ast.Proc{},
+		Ops:          []dag.Op{},
 		MergeBy:      mergeField,
 		MergeReverse: reverse,
 	}
 	for i := 0; i < N; i++ {
-		pp.Procs = append(pp.Procs, &ast.Sequential{
-			Kind:  "Sequential",
-			Procs: copyProcs(branch),
+		pp.Ops = append(pp.Ops, &dag.Sequential{
+			Kind: "Sequential",
+			Ops:  copyOps(branch),
 		})
 	}
-	return &ast.Sequential{
-		Kind:  "Sequential",
-		Procs: append([]ast.Proc{pp}, tail...),
+	return &dag.Sequential{
+		Kind: "Sequential",
+		Ops:  append([]dag.Op{pp}, tail...),
 	}, true
 }
 
-func parallelize(p ast.Proc, N int, inputSortField field.Static, inputSortReversed bool) (*ast.Sequential, bool) {
+func parallelize(p dag.Op, N int, inputSortField field.Static, inputSortReversed bool) (*dag.Sequential, bool) {
 	if p == nil {
 		panic("parallelize nil")
 	}
@@ -228,75 +228,75 @@ func parallelize(p ast.Proc, N int, inputSortField field.Static, inputSortRevers
 	seq := ensureSequentialProc(p)
 	orderSensitiveTail := true
 loop:
-	for i := range seq.Procs {
-		switch seq.Procs[i].(type) {
-		case *ast.Sort, *ast.Summarize:
+	for i := range seq.Ops {
+		switch seq.Ops[i].(type) {
+		case *dag.Sort, *dag.Summarize:
 			orderSensitiveTail = false
 			break loop
 		default:
 			continue
 		}
 	}
-	for i := range seq.Procs {
-		switch p := seq.Procs[i].(type) {
-		case *ast.Filter, *ast.Pass, *ast.Const, *ast.TypeProc:
+	for i := range seq.Ops {
+		switch p := seq.Ops[i].(type) {
+		case *dag.Filter, *dag.Pass, *dag.Const, *dag.TypeProc:
 			// Stateless procs: continue until we reach one of the procs below at
 			// which point we'll either split the flowgraph or see we can't and return it as-is.
 			continue
-		case *ast.Cut, *ast.Pick:
+		case *dag.Cut, *dag.Pick:
 			if inputSortField == nil || !orderSensitiveTail {
 				continue
 			}
-			var fields []ast.Assignment
-			if cut, ok := p.(*ast.Cut); ok {
+			var fields []dag.Assignment
+			if cut, ok := p.(*dag.Cut); ok {
 				fields = cut.Args
 			} else {
-				fields = p.(*ast.Pick).Args
+				fields = p.(*dag.Pick).Args
 			}
 			var found bool
 			for _, f := range fields {
 				fieldName := exprToField(f.RHS)
 				lhs := exprToField(f.LHS)
 				if fieldName != nil && !fieldName.Equal(inputSortField) && lhs.Equal(inputSortField) {
-					return buildSplitFlowgraph(seq.Procs[0:i], seq.Procs[i:], inputSortField, inputSortReversed, N)
+					return buildSplitFlowgraph(seq.Ops[0:i], seq.Ops[i:], inputSortField, inputSortReversed, N)
 				}
 				if fieldName != nil && fieldName.Equal(inputSortField) && (lhs == nil || lhs.Equal(inputSortField)) {
 					found = true
 				}
 			}
 			if !found {
-				return buildSplitFlowgraph(seq.Procs[0:i], seq.Procs[i:], inputSortField, inputSortReversed, N)
+				return buildSplitFlowgraph(seq.Ops[0:i], seq.Ops[i:], inputSortField, inputSortReversed, N)
 			}
-		case *ast.Drop:
+		case *dag.Drop:
 			if inputSortField == nil || !orderSensitiveTail {
 				continue
 			}
 			for _, e := range p.Args {
 				if eq(e, inputSortField) {
-					return buildSplitFlowgraph(seq.Procs[0:i], seq.Procs[i:], inputSortField, inputSortReversed, N)
+					return buildSplitFlowgraph(seq.Ops[0:i], seq.Ops[i:], inputSortField, inputSortReversed, N)
 				}
 			}
 			continue
-		case *ast.Put:
+		case *dag.Put:
 			if inputSortField == nil || !orderSensitiveTail {
 				continue
 			}
 			for _, c := range p.Args {
 				if eq(c.LHS, inputSortField) {
-					return buildSplitFlowgraph(seq.Procs[0:i], seq.Procs[i:], inputSortField, inputSortReversed, N)
+					return buildSplitFlowgraph(seq.Ops[0:i], seq.Ops[i:], inputSortField, inputSortReversed, N)
 				}
 			}
 			continue
-		case *ast.Rename:
+		case *dag.Rename:
 			if inputSortField == nil || !orderSensitiveTail {
 				continue
 			}
 			for _, f := range p.Args {
 				if eq(f.LHS, inputSortField) {
-					return buildSplitFlowgraph(seq.Procs[0:i], seq.Procs[i:], inputSortField, inputSortReversed, N)
+					return buildSplitFlowgraph(seq.Ops[0:i], seq.Ops[i:], inputSortField, inputSortReversed, N)
 				}
 			}
-		case *ast.Summarize:
+		case *dag.Summarize:
 			// To decompose the groupby, we split the flowgraph into branches that run up to and including a groupby,
 			// followed by a post-merge groupby that composes the results.
 			var mergeField field.Static
@@ -304,14 +304,14 @@ loop:
 				// Group by time requires a time-ordered merge, irrespective of any upstream ordering.
 				mergeField = field.New("ts")
 			}
-			branch := copyProcs(seq.Procs[0 : i+1])
-			branch[len(branch)-1].(*ast.Summarize).PartialsOut = true
+			branch := copyOps(seq.Ops[0 : i+1])
+			branch[len(branch)-1].(*dag.Summarize).PartialsOut = true
 
-			composerGroupBy := copyProcs([]ast.Proc{p})[0].(*ast.Summarize)
+			composerGroupBy := copyOps([]dag.Op{p})[0].(*dag.Summarize)
 			composerGroupBy.PartialsIn = true
 
-			return buildSplitFlowgraph(branch, append([]ast.Proc{composerGroupBy}, seq.Procs[i+1:]...), mergeField, inputSortReversed, N)
-		case *ast.Sort:
+			return buildSplitFlowgraph(branch, append([]dag.Op{composerGroupBy}, seq.Ops[i+1:]...), mergeField, inputSortReversed, N)
+		case *dag.Sort:
 			dir := map[int]bool{-1: true, 1: false}[p.SortDir]
 			if len(p.Args) == 1 {
 				// Single sort field: we can sort in each parallel branch, and then do an ordered merge.
@@ -319,33 +319,33 @@ loop:
 				if mergeField == nil {
 					return seq, false
 				}
-				return buildSplitFlowgraph(seq.Procs[0:i+1], seq.Procs[i+1:], mergeField, dir, N)
+				return buildSplitFlowgraph(seq.Ops[0:i+1], seq.Ops[i+1:], mergeField, dir, N)
 			} else {
 				// Unknown or multiple sort fields: we sort after the merge point, which can be unordered.
-				return buildSplitFlowgraph(seq.Procs[0:i], seq.Procs[i:], nil, dir, N)
+				return buildSplitFlowgraph(seq.Ops[0:i], seq.Ops[i:], nil, dir, N)
 			}
-		case *ast.Parallel:
+		case *dag.Parallel:
 			return seq, false
-		case *ast.Head, *ast.Tail:
+		case *dag.Head, *dag.Tail:
 			if inputSortField == nil {
 				// Unknown order: we can't parallelize because we can't maintain this unknown order at the merge point.
 				return seq, false
 			}
 			// put one head/tail on each parallel branch and one after the merge.
-			return buildSplitFlowgraph(seq.Procs[0:i+1], seq.Procs[i:], inputSortField, inputSortReversed, N)
-		case *ast.Uniq, *ast.Fuse:
+			return buildSplitFlowgraph(seq.Ops[0:i+1], seq.Ops[i:], inputSortField, inputSortReversed, N)
+		case *dag.Uniq, *dag.Fuse:
 			if inputSortField == nil {
 				// Unknown order: we can't parallelize because we can't maintain this unknown order at the merge point.
 				return seq, false
 			}
 			// Split all the upstream procs into parallel branches, then merge and continue with this and any remaining procs.
-			return buildSplitFlowgraph(seq.Procs[0:i], seq.Procs[i:], inputSortField, inputSortReversed, N)
-		case *ast.Sequential:
+			return buildSplitFlowgraph(seq.Ops[0:i], seq.Ops[i:], inputSortField, inputSortReversed, N)
+		case *dag.Sequential:
 			return seq, false
 			// XXX Joins can be parallelized but we need to write
 			// the code to parallelize the flow graph, which is a bit
 			// different from how group-bys are parallelized.
-		case *ast.Join:
+		case *dag.Join:
 			return seq, false
 		default:
 			panic(fmt.Sprintf("proc type not handled: %T", p))
@@ -358,5 +358,5 @@ loop:
 	if inputSortField == nil {
 		return seq, false
 	}
-	return buildSplitFlowgraph(seq.Procs, nil, inputSortField, inputSortReversed, N)
+	return buildSplitFlowgraph(seq.Ops, nil, inputSortField, inputSortReversed, N)
 }

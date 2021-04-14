@@ -4,18 +4,18 @@ import (
 	"strings"
 
 	"github.com/brimdata/zed/compiler/ast"
-	"github.com/brimdata/zed/zng"
+	"github.com/brimdata/zed/compiler/ast/zed"
 )
 
-func Canonical(p ast.Proc) string {
-	c := &canon{formatter: formatter{tab: 2}, head: true, first: true}
+func AST(p ast.Proc) string {
+	c := &canon{canonZed: canonZed{formatter{tab: 2}}, head: true, first: true}
 	c.proc(p)
 	c.flush()
 	return c.String()
 }
 
 type canon struct {
-	formatter
+	canonZed
 	head  bool
 	first bool
 }
@@ -64,13 +64,9 @@ func (c *canon) expr(e ast.Expr, paren bool) {
 			c.write(" where ")
 			c.expr(e.Where, false)
 		}
-	case *ast.Primitive:
+	case *zed.Primitive:
 		c.literal(*e)
 	case *ast.ID:
-		// If the identifier refers to a named variable in scope (like "$"),
-		// then return a Var expression referring to the pointer to the value.
-		// Note that constants may be accessed this way too by entering their
-		// names into the global (outermost) scope in the Scope entity.
 		c.write(e.Name)
 	case *ast.Root:
 		c.write(".")
@@ -102,11 +98,7 @@ func (c *canon) expr(e ast.Expr, paren bool) {
 		c.write(")")
 	case *ast.SQLExpr:
 		c.sql(e)
-	case *ast.Path:
-		c.fieldpath(e.Name)
-	case *ast.Ref:
-		c.write("%s", e.Name)
-	case *ast.TypeValue:
+	case *zed.TypeValue:
 		c.write("type(")
 		c.typ(e.Value)
 		c.write(")")
@@ -162,11 +154,6 @@ func (c *canon) sql(e *ast.SQLExpr) {
 func isRoot(e ast.Expr) bool {
 	if _, ok := e.(*ast.Root); ok {
 		return true
-	}
-	if f, ok := e.(*ast.Path); ok {
-		if f.Name != nil && len(f.Name) == 0 {
-			return true
-		}
 	}
 	return false
 }
@@ -295,15 +282,6 @@ func (c *canon) proc(p ast.Proc) {
 			c.write(" every ")
 			c.literal(*p.Duration)
 		}
-		if p.PartialsIn {
-			c.write(" partials-in")
-		}
-		if p.PartialsOut {
-			c.write(" partials-out")
-		}
-		if p.InputSortDir != 0 {
-			c.write(" sort-dir %d", p.InputSortDir)
-		}
 		c.ret()
 		c.open()
 		c.assignments(p.Aggs)
@@ -407,102 +385,8 @@ func (c *canon) proc(p ast.Proc) {
 }
 
 func isTrue(e ast.Expr) bool {
-	if p, ok := e.(*ast.Primitive); ok {
+	if p, ok := e.(*zed.Primitive); ok {
 		return p.Type == "bool" && p.Text == "true"
 	}
 	return false
-}
-
-//XXX this needs to change when we use the zson values from the ast
-func (c *canon) literal(e ast.Primitive) {
-	switch e.Type {
-	case "string", "bstring", "error":
-		c.write("\"%s\"", e.Text)
-	case "regexp":
-		c.write("/%s/", e.Text)
-	default:
-		//XXX need decorators for non-implied
-		c.write("%s", e.Text)
-
-	}
-}
-
-func (c *canon) fieldpath(path []string) {
-	if len(path) == 0 {
-		c.write(".")
-		return
-	}
-	for k, s := range path {
-		if zng.IsIdentifier(s) {
-			if k != 0 {
-				c.write(".")
-			}
-			c.write(s)
-		} else {
-			if k == 0 {
-				c.write(".")
-			}
-			c.write("[%q]", s)
-		}
-	}
-}
-
-func (c *canon) typ(t ast.Type) {
-	switch t := t.(type) {
-	case *ast.TypePrimitive:
-		c.write(t.Name)
-	case *ast.TypeRecord:
-		c.write("{")
-		c.typeFields(t.Fields)
-		c.write("}")
-	case *ast.TypeArray:
-		c.write("[")
-		c.typ(t.Type)
-		c.write("]")
-	case *ast.TypeSet:
-		c.write("|[")
-		c.typ(t.Type)
-		c.write("]|")
-	case *ast.TypeUnion:
-		c.write("(")
-		c.types(t.Types)
-		c.write(")")
-	case *ast.TypeEnum:
-		//XXX need to figure out Z syntax for enum literal which may
-		// be different than zson, requiring some ast adjustments.
-		c.write("TBD:ENUM")
-	case *ast.TypeMap:
-		c.write("|{")
-		c.typ(t.KeyType)
-		c.write(",")
-		c.typ(t.ValType)
-		c.write("}|")
-	case *ast.TypeNull:
-		c.write("null")
-	case *ast.TypeDef:
-		c.write("%s=(", t.Name)
-		c.typ(t.Type)
-		c.write(")")
-	case *ast.TypeName:
-		c.write(t.Name)
-	}
-}
-
-func (c *canon) typeFields(fields []ast.TypeField) {
-	for k, f := range fields {
-		if k != 0 {
-			c.write(",")
-		}
-		c.write("%s:", zng.QuotedName(f.Name))
-		c.typ(f.Type)
-	}
-}
-
-func (c *canon) types(types []ast.Type) {
-	for k, t := range types {
-		if k != 0 {
-			c.write(",")
-		}
-		c.typ(t)
-	}
 }

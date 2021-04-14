@@ -2,34 +2,36 @@ package semantic
 
 import (
 	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/dag"
 	"github.com/brimdata/zed/field"
 )
 
 type AST struct {
-	entry   ast.Proc
-	unopt   ast.Proc
-	consts  []ast.Proc
-	filter  ast.Expr
+	ast     ast.Proc
+	dag     dag.Op
+	unopt   dag.Op
+	consts  []dag.Op
+	filter  dag.Expr
 	sortKey field.Static
 	sortRev bool
 }
 
 func New(entry ast.Proc) *AST {
 	if entry == nil {
-		entry = passProc
+		entry = &ast.Pass{"Pass"}
 	}
-	return &AST{entry: entry}
+	return &AST{ast: entry}
 }
 
-func (a *AST) Entry() ast.Proc {
-	return a.entry
+func (a *AST) Entry() dag.Op {
+	return a.dag
 }
 
-func (a *AST) Consts() []ast.Proc {
+func (a *AST) Consts() []dag.Op {
 	return a.consts
 }
 
-func (a *AST) Filter() ast.Expr {
+func (a *AST) Filter() dag.Expr {
 	return a.filter
 }
 
@@ -38,15 +40,15 @@ func (a *AST) Analyze() error {
 	var err error
 	scope := NewScope()
 	scope.Enter()
-	a.consts, err = semConsts(nil, scope, a.entry)
+	a.consts, err = semConsts(nil, scope, a.ast)
 	if err != nil {
 		return err
 	}
-	a.entry, err = semProc(scope, a.entry)
+	a.dag, err = semProc(scope, a.ast)
 	if err != nil {
 		return err
 	}
-	a.unopt = a.entry
+	a.unopt = a.dag
 	return nil
 }
 
@@ -56,20 +58,20 @@ func (a *AST) Optimize() error {
 	// used by ZST to read only the columns but we need a bit more
 	// data structure here.  Also, this is where we would push
 	// analytics and search|cut into the column reader.
-	a.filter, a.entry = liftFilter(a.entry)
+	a.filter, a.dag = liftFilter(a.dag)
 	return nil
 }
 
 func (a *AST) SetInputOrder(sortKey field.Static, sortRev bool) {
 	a.sortKey = sortKey
 	a.sortRev = sortRev
-	SetGroupByProcInputSortDir(a.entry, sortKey, zbufDirInt(sortRev))
+	SetGroupByProcInputSortDir(a.dag, sortKey, zbufDirInt(sortRev))
 }
 
 // IsParallelizable reports whether Parallelize can parallelize p when called
 // with the same arguments.
 func (a *AST) IsParallelizable() bool {
-	_, ok := parallelize(copyProc(a.unopt), 0, a.sortKey, a.sortRev)
+	_, ok := parallelize(copyOp(a.unopt), 0, a.sortKey, a.sortRev)
 	return ok
 }
 
@@ -78,9 +80,9 @@ func (a *AST) IsParallelizable() bool {
 // into n parallel branches. The boolean return argument indicates
 // whether the flowgraph could be parallelized.
 func (a *AST) Parallelize(n int) bool {
-	p, ok := parallelize(copyProc(a.unopt), n, a.sortKey, a.sortRev)
+	p, ok := parallelize(copyOp(a.unopt), n, a.sortKey, a.sortRev)
 	if ok {
-		a.entry = p
+		a.dag = p
 	}
 	return ok
 }

@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/dag"
 	"github.com/brimdata/zed/compiler/kernel"
 	"github.com/brimdata/zed/compiler/parser"
 	"github.com/brimdata/zed/compiler/semantic"
@@ -58,7 +59,7 @@ func (r *Runtime) Outputs() []proc.Interface {
 	return r.outputs
 }
 
-func (r *Runtime) Entry() ast.Proc {
+func (r *Runtime) Entry() dag.Op {
 	//XXX need to prepend consts depending on context
 	return r.sem.Entry()
 }
@@ -88,7 +89,7 @@ func (r *Runtime) AsBufferFilter() (*expr.BufferFilter, error) {
 // AsProc returns the lifted filter and any consts if present as a proc so that,
 // for instance, the root worker (or a sub-worker) can push the filter over the
 // net to the source scanner.
-func (r *Runtime) AsProc() ast.Proc {
+func (r *Runtime) AsProc() dag.Op {
 	if r == nil {
 		return nil
 	}
@@ -96,19 +97,22 @@ func (r *Runtime) AsProc() ast.Proc {
 	if f == nil {
 		return nil
 	}
-	p := ast.FilterToProc(f)
+	p := &dag.Filter{
+		Kind: "Filter",
+		Expr: f,
+	}
 	consts := r.sem.Consts()
 	if len(consts) == 0 {
 		return p
 	}
-	var procs []ast.Proc
+	var ops []dag.Op
 	for _, p := range consts {
-		procs = append(procs, p)
+		ops = append(ops, p)
 	}
-	procs = append(procs, p)
-	return &ast.Sequential{
-		Kind:  "Sequential",
-		Procs: procs,
+	ops = append(ops, p)
+	return &dag.Sequential{
+		Kind: "Sequential",
+		Ops:  ops,
 	}
 }
 

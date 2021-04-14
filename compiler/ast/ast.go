@@ -2,6 +2,11 @@
 // queries.
 package ast
 
+import (
+	"github.com/brimdata/zed/compiler/ast/zed"
+	"github.com/brimdata/zed/field"
+)
+
 // This module is derived from the GO ast design pattern
 // https://golang.org/pkg/go/ast/
 //
@@ -9,27 +14,16 @@ package ast
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-import (
-	"github.com/brimdata/zed/field"
-)
-
 // Proc is the interface implemented by all AST processor nodes.
 type Proc interface {
-	ProcNode()
+	ProcAST()
 }
 
-// ID refers to a syntax element analogous to a programming language identifier.
+type Expr interface {
+	ExprAST()
+}
+
 type ID struct {
-	Kind string `json:"kind" unpack:""`
-	Name string `json:"name"`
-}
-
-type Path struct {
-	Kind string   `json:"kind" unpack:""`
-	Name []string `json:"name"`
-}
-
-type Ref struct {
 	Kind string `json:"kind" unpack:""`
 	Name string `json:"name"`
 }
@@ -40,14 +34,10 @@ type Root struct {
 	Kind string `json:"kind" unpack:""`
 }
 
-type Expr interface {
-	exprNode()
-}
-
 type Search struct {
-	Kind  string    `json:"kind" unpack:""`
-	Text  string    `json:"text"`
-	Value Primitive `json:"value"` //XXX search should be extended to complex types
+	Kind  string        `json:"kind" unpack:""`
+	Text  string        `json:"text"`
+	Value zed.Primitive `json:"value"` //XXX search should be extended to complex types
 }
 
 type UnaryExpr struct {
@@ -94,9 +84,9 @@ type Call struct {
 }
 
 type Cast struct {
-	Kind string `json:"kind" unpack:""`
-	Expr Expr   `json:"expr"`
-	Type Type   `json:"type"`
+	Kind string   `json:"kind" unpack:""`
+	Expr Expr     `json:"expr"`
+	Type zed.Type `json:"type"`
 }
 
 type SeqExpr struct {
@@ -147,32 +137,28 @@ type EntryExpr struct {
 	Value Expr `json:"value"`
 }
 
-func (*UnaryExpr) exprNode()   {}
-func (*BinaryExpr) exprNode()  {}
-func (*SelectExpr) exprNode()  {}
-func (*Conditional) exprNode() {}
-func (*Search) exprNode()      {}
-func (*Call) exprNode()        {}
-func (*Cast) exprNode()        {}
-func (*Primitive) exprNode()   {}
-func (*ID) exprNode()          {}
-func (*Path) exprNode()        {}
-func (*Ref) exprNode()         {}
-func (*Root) exprNode()        {}
+func (*UnaryExpr) ExprAST()   {}
+func (*BinaryExpr) ExprAST()  {}
+func (*SelectExpr) ExprAST()  {}
+func (*Conditional) ExprAST() {}
+func (*Search) ExprAST()      {}
+func (*Call) ExprAST()        {}
+func (*Cast) ExprAST()        {}
+func (*ID) ExprAST()          {}
+func (*Root) ExprAST()        {}
 
-func (*Assignment) exprNode()   {}
-func (*Agg) exprNode()          {}
-func (*SeqExpr) exprNode()      {}
-func (*RegexpSearch) exprNode() {}
-func (*RegexpMatch) exprNode()  {}
-func (*TypeValue) exprNode()    {}
+func (*Assignment) ExprAST()   {}
+func (*Agg) ExprAST()          {}
+func (*SeqExpr) ExprAST()      {}
+func (*RegexpSearch) ExprAST() {}
+func (*RegexpMatch) ExprAST()  {}
 
-func (*RecordExpr) exprNode() {}
-func (*ArrayExpr) exprNode()  {}
-func (*SetExpr) exprNode()    {}
-func (*MapExpr) exprNode()    {}
+func (*RecordExpr) ExprAST() {}
+func (*ArrayExpr) ExprAST()  {}
+func (*SetExpr) ExprAST()    {}
+func (*MapExpr) ExprAST()    {}
 
-func (*SQLExpr) exprNode() {}
+func (*SQLExpr) ExprAST() {}
 
 // ----------------------------------------------------------------------------
 // Procs
@@ -206,11 +192,6 @@ type (
 	Switch struct {
 		Kind  string `json:"kind" unpack:""`
 		Cases []Case `json:"cases"`
-		// If non-zero, MergeField contains the field name on
-		// which the branches of this parallel proc should be
-		// merged in the order indicated by MergeReverse.
-		MergeBy      field.Static `json:"merge_by,omitempty"`
-		MergeReverse bool         `json:"merge_reverse,omitempty"`
 	}
 	// A Sort proc represents a proc that sorts records.
 	Sort struct {
@@ -287,14 +268,11 @@ type (
 	// output result; likewise, if PartialsIn is true, the proc will
 	// expect partial results as input.
 	Summarize struct {
-		Kind         string       `json:"kind" unpack:""`
-		Duration     *Primitive   `json:"duration"`
-		InputSortDir int          `json:"input_sort_dir,omitempty"`
-		Limit        int          `json:"limit"`
-		Keys         []Assignment `json:"keys"`
-		Aggs         []Assignment `json:"aggs"`
-		PartialsIn   bool         `json:"partials_in,omitempty"`
-		PartialsOut  bool         `json:"partials_out,omitempty"`
+		Kind     string         `json:"kind" unpack:""`
+		Duration *zed.Primitive `json:"duration"`
+		Limit    int            `json:"limit"`
+		Keys     []Assignment   `json:"keys"`
+		Aggs     []Assignment   `json:"aggs"`
 	}
 	// A Top proc is similar to a Sort with a few key differences:
 	// - It only sorts in descending order.
@@ -342,9 +320,9 @@ type (
 	}
 
 	TypeProc struct {
-		Kind string `json:"kind" unpack:""`
-		Name string `json:"name"`
-		Type Type   `json:"type"`
+		Kind string   `json:"kind" unpack:""`
+		Name string   `json:"name"`
+		Type zed.Type `json:"type"`
 	}
 	// A SQLExpr can be a proc, an expression inside of a SQL FROM clause,
 	// or an expression used as a Z value generator.  Currenly, the "select"
@@ -404,30 +382,30 @@ type Assignment struct {
 	RHS  Expr   `json:"rhs"`
 }
 
-func (*Sequential) ProcNode() {}
-func (*Parallel) ProcNode()   {}
-func (*Switch) ProcNode()     {}
-func (*Sort) ProcNode()       {}
-func (*Cut) ProcNode()        {}
-func (*Pick) ProcNode()       {}
-func (*Drop) ProcNode()       {}
-func (*Head) ProcNode()       {}
-func (*Tail) ProcNode()       {}
-func (*Pass) ProcNode()       {}
-func (*Filter) ProcNode()     {}
-func (*Uniq) ProcNode()       {}
-func (*Summarize) ProcNode()  {}
-func (*Top) ProcNode()        {}
-func (*Put) ProcNode()        {}
-func (*Rename) ProcNode()     {}
-func (*Fuse) ProcNode()       {}
-func (*Join) ProcNode()       {}
-func (*Const) ProcNode()      {}
-func (*TypeProc) ProcNode()   {}
-func (*Call) ProcNode()       {}
-func (*Shape) ProcNode()      {}
+func (*Sequential) ProcAST() {}
+func (*Parallel) ProcAST()   {}
+func (*Switch) ProcAST()     {}
+func (*Sort) ProcAST()       {}
+func (*Cut) ProcAST()        {}
+func (*Pick) ProcAST()       {}
+func (*Drop) ProcAST()       {}
+func (*Head) ProcAST()       {}
+func (*Tail) ProcAST()       {}
+func (*Pass) ProcAST()       {}
+func (*Filter) ProcAST()     {}
+func (*Uniq) ProcAST()       {}
+func (*Summarize) ProcAST()  {}
+func (*Top) ProcAST()        {}
+func (*Put) ProcAST()        {}
+func (*Rename) ProcAST()     {}
+func (*Fuse) ProcAST()       {}
+func (*Join) ProcAST()       {}
+func (*Const) ProcAST()      {}
+func (*TypeProc) ProcAST()   {}
+func (*Call) ProcAST()       {}
+func (*Shape) ProcAST()      {}
 
-func (*SQLExpr) ProcNode() {}
+func (*SQLExpr) ProcAST() {}
 
 // An Agg is an AST node that represents a aggregate function.  The Name
 // field indicates the aggregation method while the Expr field indicates
@@ -440,61 +418,6 @@ type Agg struct {
 	Name  string `json:"name"`
 	Expr  Expr   `json:"expr"`
 	Where Expr   `json:"where"`
-}
-
-func DotExprToFieldPath(e Expr) *Path {
-	switch e := e.(type) {
-	case *BinaryExpr:
-		if e.Op == "." {
-			lhs := DotExprToFieldPath(e.LHS)
-			if lhs == nil {
-				return nil
-			}
-			id, ok := e.RHS.(*ID)
-			if !ok {
-				return nil
-			}
-			lhs.Name = append(lhs.Name, id.Name)
-			return lhs
-		}
-		if e.Op == "[" {
-			lhs := DotExprToFieldPath(e.LHS)
-			if lhs == nil {
-				return nil
-			}
-			id, ok := e.RHS.(*Primitive)
-			if !ok || id.Type != "string" {
-				return nil
-			}
-			lhs.Name = append(lhs.Name, id.Text)
-			return lhs
-		}
-	case *ID:
-		return &Path{Kind: "Path", Name: []string{e.Name}}
-	case *Root:
-		return &Path{Kind: "Path", Name: []string{}}
-	}
-	// This includes a null Expr, which can happen if the AST is missing
-	// a field or sets it to null.
-	return nil
-}
-
-func FieldsOf(e Expr) []field.Static {
-	switch e := e.(type) {
-	default:
-		if f := DotExprToFieldPath(e); f != nil {
-			return []field.Static{f.Name}
-		}
-		return nil
-	case *Assignment:
-		return append(FieldsOf(e.LHS), FieldsOf(e.RHS)...)
-	case *SelectExpr:
-		var fields []field.Static
-		for _, selector := range e.Selectors {
-			fields = append(fields, FieldsOf(selector)...)
-		}
-		return fields
-	}
 }
 
 func NewDotExpr(f field.Static) Expr {
@@ -545,8 +468,4 @@ func FilterToProc(e Expr) *Filter {
 		Kind: "Filter",
 		Expr: e,
 	}
-}
-
-func (p *Path) String() string {
-	return field.Static(p.Name).String()
 }

@@ -5,28 +5,36 @@ import (
 	"fmt"
 
 	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/dag"
+	"github.com/brimdata/zed/compiler/ast/zed"
 	"github.com/brimdata/zed/expr/agg"
 	"github.com/brimdata/zed/field"
 )
 
-func convertSQLProc(scope *Scope, sql *ast.SQLExpr) (ast.Proc, error) {
+func convertSQLProc(scope *Scope, sql *ast.SQLExpr) (dag.Op, error) {
 	selection, err := newSQLSelection(scope, sql.Select)
 	if err != err {
 		return nil, err
 	}
-	var procs []ast.Proc
+	var where dag.Expr
+	if sql.Where != nil {
+		where, err = semExpr(scope, sql.Where)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var ops []dag.Op
 	if sql.From != nil {
+		alias, aliasID, err := convertSQLAlias(scope, sql.From.Alias)
+		if err != nil {
+			return nil, err
+		}
 		tableFilter, err := convertSQLTableRef(scope, sql.From.Table)
 		if err != nil {
 			return nil, err
 		}
-		procs = append(procs, tableFilter)
-		if sql.From.Alias != nil {
-			// If there's an alias, we do a 'cut alias=.'
-			alias, err := convertSQLAlias(scope, sql.From.Alias)
-			if err != nil {
-				return nil, err
-			}
+		ops = append(ops, tableFilter)
+		if aliasID != "" {
 			// If the FROM table has been aliased and all join clauses, if any,
 			// are also aliased, then we can lift any where claused that is dependent
 			// only on the FROM table or is a component of a logical AND and that
@@ -34,46 +42,46 @@ func convertSQLProc(scope *Scope, sql *ast.SQLExpr) (ast.Proc, error) {
 			// the filter predicate after the FROM expression and before everything else.
 			// This is a "peephole" optimization that will go away once we
 			// have fully fledge data-flow-based optimizations.
-			if sql.Where != nil {
-				if f := liftWhereFilter(sql.From.Alias, sql.Where, sql.Joins); f != nil {
-					procs = append(procs, f)
+			if where != nil {
+				if f := liftWhereFilter(aliasID, where, sql.Joins); f != nil {
+					ops = append(ops, f)
 				}
 			}
-			procs = append(procs, alias)
+			ops = append(ops, alias)
 		}
 	}
 	if sql.Joins != nil {
-		if len(procs) == 0 {
+		if len(ops) == 0 {
 			return nil, errors.New("cannot JOIN without a FROM")
 		}
-		procs, err = convertSQLJoins(scope, procs, sql.Joins)
+		ops, err = convertSQLJoins(scope, ops, sql.Joins)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if sql.Where != nil {
-		filter := &ast.Filter{
+	if where != nil {
+		filter := &dag.Filter{
 			Kind: "Filter",
-			Expr: sql.Where,
+			Expr: where,
 		}
-		procs = append(procs, filter)
+		ops = append(ops, filter)
 	}
 	if sql.GroupBy != nil {
 		groupby, err := convertSQLGroupBy(scope, sql.GroupBy, selection)
 		if err != nil {
 			return nil, err
 		}
-		procs = append(procs, groupby)
+		ops = append(ops, groupby)
 		if sql.Having != nil {
 			having, err := semExpr(scope, sql.Having)
 			if err != nil {
 				return nil, err
 			}
-			filter := &ast.Filter{
+			filter := &dag.Filter{
 				Kind: "Filter",
 				Expr: having,
 			}
-			procs = append(procs, filter)
+			ops = append(ops, filter)
 		}
 	} else if sql.Select != nil {
 		if sql.Having != nil {
@@ -87,23 +95,27 @@ func convertSQLProc(scope *Scope, sql *ast.SQLExpr) (ast.Proc, error) {
 			return nil, err
 		}
 		if selector != nil {
-			procs = append(procs, selector)
+			ops = append(ops, selector)
 		}
 	}
 	if sql.OrderBy != nil {
-		procs = append(procs, sortByMulti(sql.OrderBy.Keys, sql.OrderBy.Order))
+		keys, err := semExprs(scope, sql.OrderBy.Keys)
+		if err != nil {
+			return nil, err
+		}
+		ops = append(ops, sortByMulti(keys, sql.OrderBy.Order))
 	}
 	if sql.Limit != 0 {
-		p := &ast.Head{
+		p := &dag.Head{
 			Kind:  "Head",
 			Count: sql.Limit,
 		}
-		procs = append(procs, p)
+		ops = append(ops, p)
 	}
-	if len(procs) == 0 {
-		procs = []ast.Proc{passProc}
+	if len(ops) == 0 {
+		ops = []dag.Op{&dag.Pass{"Pass"}}
 	}
-	return wrap(procs), nil
+	return wrap(ops), nil
 }
 
 func isID(e ast.Expr) (string, bool) {
@@ -113,12 +125,10 @@ func isID(e ast.Expr) (string, bool) {
 	return "", false
 }
 
-func liftWhereFilter(alias, where ast.Expr, joins []ast.SQLJoin) *ast.Filter {
-	aliasID, ok := isID(alias)
-	if !ok {
-		return nil
-	}
+func liftWhereFilter(aliasID string, where dag.Expr, joins []ast.SQLJoin) *dag.Filter {
 	for _, join := range joins {
+		// For now, if there are multiple join aliases, be pessimistic
+		// and don't try to lift the where.  We can fix this later.
 		if _, ok := isID(join.Alias); !ok {
 			return nil
 		}
@@ -127,33 +137,39 @@ func liftWhereFilter(alias, where ast.Expr, joins []ast.SQLJoin) *ast.Filter {
 	if eligible == nil {
 		return nil
 	}
-	return &ast.Filter{
+	return &dag.Filter{
 		Kind: "Filter",
 		Expr: eligible,
 	}
 }
 
-func eligiblePred(aliasID string, e ast.Expr) ast.Expr {
+func eligiblePred(aliasID string, e dag.Expr) dag.Expr {
 	switch e := e.(type) {
-	case *ast.UnaryExpr:
+	case *dag.UnaryExpr:
 		if operand := eligiblePred(aliasID, e.Operand); operand != nil {
-			return &ast.UnaryExpr{
+			return &dag.UnaryExpr{
 				Kind:    "UnaryExpr",
 				Op:      "!",
 				Operand: operand,
 			}
 		}
-	case *ast.Primitive:
+	case *zed.Primitive:
 		return e
-	case *ast.BinaryExpr:
-		if e.Op == "." {
-			return eligibleID(aliasID, e)
-		}
+	case *dag.Dot:
+		// A field reference of the form <aliasID>.x is eligible
+		// as the field x because, when lifted it was called x.
+		return eligibleFieldRef(aliasID, e)
+	case *dag.BinaryExpr:
 		lhs := eligiblePred(aliasID, e.LHS)
 		rhs := eligiblePred(aliasID, e.RHS)
 		if e.Op == "or" {
 			if lhs != nil && rhs != nil {
-				return e
+				return &dag.BinaryExpr{
+					Kind: "BinaryExpr",
+					Op:   e.Op,
+					LHS:  lhs,
+					RHS:  rhs,
+				}
 			}
 			return nil
 		}
@@ -164,10 +180,15 @@ func eligiblePred(aliasID string, e ast.Expr) ast.Expr {
 			if rhs == nil {
 				return lhs
 			}
-			return e
+			return &dag.BinaryExpr{
+				Kind: "BinaryExpr",
+				Op:   e.Op,
+				LHS:  lhs,
+				RHS:  rhs,
+			}
 		}
 		if lhs != nil && rhs != nil {
-			return &ast.BinaryExpr{
+			return &dag.BinaryExpr{
 				Kind: "BinaryExpr",
 				Op:   e.Op,
 				LHS:  lhs,
@@ -178,62 +199,82 @@ func eligiblePred(aliasID string, e ast.Expr) ast.Expr {
 	return nil
 }
 
-func eligibleID(aliasID string, e *ast.BinaryExpr) ast.Expr {
-	if id, ok := e.LHS.(*ast.ID); ok && id.Name == aliasID {
-		return e.RHS
+func eligibleFieldRef(aliasID string, e *dag.Dot) dag.Expr {
+	lhs, ok := e.LHS.(*dag.Dot)
+	if ok && dag.IsRoot(lhs) && lhs.RHS == aliasID {
+		return &dag.Dot{
+			Kind: "Dot",
+			LHS:  dag.Root,
+			RHS:  e.RHS,
+		}
 	}
 	return nil
 }
 
-func convertSQLTableRef(scope *Scope, e ast.Expr) (ast.Proc, error) {
+func convertSQLTableRef(scope *Scope, e ast.Expr) (dag.Op, error) {
+	converted, err := semExpr(scope, e)
+	if err != nil {
+		return nil, err
+	}
 	// If an identifier name is given with no definition for that name,
 	// then convert it to a type name as it is otherwise expected that
 	// the type name will be defined by the data stream.
-	if id, ok := e.(*ast.ID); ok && scope.Lookup(id.Name) == nil {
-		e = &ast.TypeValue{
+	if id, ok := dag.RootField(converted); ok && scope.Lookup(id) == nil {
+		converted = &zed.TypeValue{
 			Kind: "TypeValue",
-			Value: &ast.TypeName{
+			Value: &zed.TypeName{
 				Kind: "TypeName",
-				Name: id.Name,
+				Name: id,
 			},
 		}
 	}
-	return &ast.Call{
-		Kind: "Call",
-		Name: "is",
-		Args: []ast.Expr{e},
+	return &dag.Filter{
+		Kind: "Filter",
+		Expr: &dag.Call{
+			Kind: "Call",
+			Name: "is",
+			Args: []dag.Expr{converted},
+		},
 	}, nil
 }
 
-func convertSQLAlias(scope *Scope, e ast.Expr) (*ast.Cut, error) {
-	if _, err := semField(scope, e); err != nil {
-		return nil, fmt.Errorf("illegal alias: %w", err)
+func convertSQLAlias(scope *Scope, e ast.Expr) (*dag.Cut, string, error) {
+	if e == nil {
+		return nil, "", nil
 	}
-	cut := ast.Assignment{
+	fld, err := semField(scope, e)
+	if err != nil {
+		return nil, "", fmt.Errorf("illegal alias: %w", err)
+	}
+	var id string
+	if idExpr, ok := e.(*ast.ID); ok {
+		id = idExpr.Name
+	}
+	assignment := dag.Assignment{
 		Kind: "Assignment",
-		LHS:  e,
-		RHS:  &ast.Root{},
+		LHS:  fld,
+		RHS:  dag.Root,
 	}
-	return &ast.Cut{
+	return &dag.Cut{
 		Kind: "Cut",
-		Args: []ast.Assignment{cut},
-	}, nil
+		Args: []dag.Assignment{assignment},
+	}, id, nil
 }
 
-func wrap(procs []ast.Proc) ast.Proc {
-	if len(procs) == 0 {
+func wrap(ops []dag.Op) dag.Op {
+	if len(ops) == 0 {
 		return nil
 	}
-	if len(procs) == 1 {
-		return procs[0]
+	if len(ops) == 1 {
+		return ops[0]
 	}
-	return &ast.Sequential{
-		Kind:  "Sequential",
-		Procs: procs,
+	return &dag.Sequential{
+		Kind: "Sequential",
+		Ops:  ops,
 	}
 }
 
-func convertSQLJoins(scope *Scope, fromPath []ast.Proc, joins []ast.SQLJoin) ([]ast.Proc, error) {
+func convertSQLJoins(scope *Scope, fromPath []dag.Op, joins []ast.SQLJoin) ([]dag.Op, error) {
 	left := fromPath
 	for _, right := range joins {
 		var err error
@@ -247,47 +288,54 @@ func convertSQLJoins(scope *Scope, fromPath []ast.Proc, joins []ast.SQLJoin) ([]
 
 // For now, each joining table is on the right...
 // We don't have logic to not care about the side of the JOIN ON keys...
-func convertSQLJoin(scope *Scope, leftPath []ast.Proc, sqlJoin ast.SQLJoin) ([]ast.Proc, error) {
+func convertSQLJoin(scope *Scope, leftPath []dag.Op, sqlJoin ast.SQLJoin) ([]dag.Op, error) {
 	if sqlJoin.Alias == nil {
 		return nil, errors.New("JOIN currently requires alias, e.g., JOIN <type> <alias> (will be fixed soon)")
 	}
-	leftPath = append(leftPath, sortBy(sqlJoin.LeftKey))
-
+	leftKey, err := semExpr(scope, sqlJoin.LeftKey)
+	if err != nil {
+		return nil, err
+	}
+	leftPath = append(leftPath, sortBy(leftKey))
 	joinFilter, err := convertSQLTableRef(scope, sqlJoin.Table)
 	if err != nil {
 		return nil, err
 	}
-	rightPath := []ast.Proc{joinFilter}
-	cut, err := convertSQLAlias(scope, sqlJoin.Alias)
+	rightPath := []dag.Op{joinFilter}
+	cut, aliasID, err := convertSQLAlias(scope, sqlJoin.Alias)
 	if err != nil {
 		return nil, errors.New("JOIN alias must be a name")
 	}
 	rightPath = append(rightPath, cut)
-	rightPath = append(rightPath, sortBy(sqlJoin.RightKey))
-
-	fork := &ast.Parallel{
-		Kind:  "Parallel",
-		Procs: []ast.Proc{wrap(leftPath), wrap(rightPath)},
+	rightKey, err := semExpr(scope, sqlJoin.RightKey)
+	if err != nil {
+		return nil, err
 	}
-	alias := ast.Assignment{
+	rightPath = append(rightPath, sortBy(rightKey))
+	fork := &dag.Parallel{
+		Kind: "Parallel",
+		Ops:  []dag.Op{wrap(leftPath), wrap(rightPath)},
+	}
+	alias := dag.Assignment{
 		Kind: "Assignment",
-		RHS:  sqlJoin.Alias,
+		LHS:  &dag.Path{"Path", field.New(aliasID)},
+		RHS:  &dag.Path{"Path", field.New(aliasID)},
 	}
-	join := &ast.Join{
+	join := &dag.Join{
 		Kind:     "Join",
 		Style:    sqlJoin.Style,
-		LeftKey:  sqlJoin.LeftKey,
-		RightKey: sqlJoin.RightKey,
-		Args:     []ast.Assignment{alias},
+		LeftKey:  leftKey,
+		RightKey: rightKey,
+		Args:     []dag.Assignment{alias},
 	}
-	return []ast.Proc{fork, join}, nil
+	return []dag.Op{fork, join}, nil
 }
 
-func sortBy(e ast.Expr) *ast.Sort {
-	return sortByMulti([]ast.Expr{e}, "asc")
+func sortBy(e dag.Expr) *dag.Sort {
+	return sortByMulti([]dag.Expr{e}, "asc")
 }
 
-func sortByMulti(keys []ast.Expr, order string) *ast.Sort {
+func sortByMulti(keys []dag.Expr, order string) *dag.Sort {
 	// XXX ast.Sort should take a zbuf.Order instead of an in direction
 	// (and probably this constant should move out of zbuf and into ast)
 	// See issue #2397
@@ -295,14 +343,14 @@ func sortByMulti(keys []ast.Expr, order string) *ast.Sort {
 	if order == "desc" {
 		direction = -1
 	}
-	return &ast.Sort{
+	return &dag.Sort{
 		Kind:    "Sort",
 		Args:    keys,
 		SortDir: direction,
 	}
 }
 
-func convertSQLSelect(selection sqlSelection) (ast.Proc, error) {
+func convertSQLSelect(selection sqlSelection) (dag.Op, error) {
 	// This is a straight select without a group-by.
 	// If all the expressions are aggregators, then we build a group-by.
 	// If it's mixed, we return an error.  Otherwise, we do a simple cut.
@@ -324,22 +372,22 @@ func convertSQLSelect(selection sqlSelection) (ast.Proc, error) {
 	// but the sqlPick elements have this determined.  So we take the LHS
 	// from the original expression and mix it with the agg that was put
 	// in sqlPick.
-	var assignments []ast.Assignment
+	var assignments []dag.Assignment
 	for _, p := range selection {
-		a := ast.Assignment{
+		a := dag.Assignment{
 			Kind: "Assignment",
 			LHS:  p.assignment.LHS,
 			RHS:  p.agg,
 		}
 		assignments = append(assignments, a)
 	}
-	return &ast.Summarize{
+	return &dag.Summarize{
 		Kind: "Summarize",
 		Aggs: assignments,
 	}, nil
 }
 
-func convertSQLGroupBy(scope *Scope, groupByKeys []ast.Expr, selection sqlSelection) (ast.Proc, error) {
+func convertSQLGroupBy(scope *Scope, groupByKeys []ast.Expr, selection sqlSelection) (dag.Op, error) {
 	var keys []field.Static
 	for _, key := range groupByKeys {
 		name, err := sqlField(scope, key)
@@ -370,19 +418,19 @@ func convertSQLGroupBy(scope *Scope, groupByKeys []ast.Expr, selection sqlSelect
 	// key expressions from the scalars of the select and build the
 	// aggregators (aka reducers) from the aggregation functions present
 	// in the select clause.
-	var keyExprs []ast.Assignment
+	var keyExprs []dag.Assignment
 	for _, p := range scalars {
 		keyExprs = append(keyExprs, p.assignment)
 	}
-	var aggExprs []ast.Assignment
+	var aggExprs []dag.Assignment
 	for _, p := range selection.aggs() {
-		aggExprs = append(aggExprs, ast.Assignment{
+		aggExprs = append(aggExprs, dag.Assignment{
 			LHS: p.assignment.LHS,
 			RHS: p.agg,
 		})
 	}
 	// XXX how to override limit for spills?
-	return &ast.Summarize{
+	return &dag.Summarize{
 		Kind: "Summarize",
 		Keys: keyExprs,
 		Aggs: aggExprs,
@@ -396,8 +444,8 @@ func convertSQLGroupBy(scope *Scope, groupByKeys []ast.Expr, selection sqlSelect
 // keys, something that is not needed in Z.
 type sqlPick struct {
 	name       field.Static
-	agg        *ast.Agg
-	assignment ast.Assignment
+	agg        *dag.Agg
+	assignment dag.Assignment
 }
 
 type sqlSelection []sqlPick
@@ -414,11 +462,15 @@ func newSQLSelection(scope *Scope, assignments []ast.Assignment) (sqlSelection, 
 		if err != nil {
 			return nil, err
 		}
-		agg, err := isAgg(a.RHS)
+		agg, err := isAgg(scope, a.RHS)
 		if err != nil {
 			return nil, err
 		}
-		s = append(s, sqlPick{name, agg, a})
+		assignment, err := semAssignment(scope, a)
+		if err != nil {
+			return nil, err
+		}
+		s = append(s, sqlPick{name, agg, assignment})
 	}
 	return s, nil
 }
@@ -451,21 +503,21 @@ func (s sqlSelection) scalars() sqlSelection {
 	return scalars
 }
 
-func (s sqlSelection) cut() *ast.Cut {
+func (s sqlSelection) cut() *dag.Cut {
 	if len(s) == 0 {
 		return nil
 	}
-	var a []ast.Assignment
+	var a []dag.Assignment
 	for _, p := range s {
 		a = append(a, p.assignment)
 	}
-	return &ast.Cut{
+	return &dag.Cut{
 		Kind: "Cut",
 		Args: a,
 	}
 }
 
-func isAgg(e ast.Expr) (*ast.Agg, error) {
+func isAgg(scope *Scope, e ast.Expr) (*dag.Agg, error) {
 	call, ok := e.(*ast.Call)
 	if !ok {
 		return nil, nil
@@ -480,10 +532,18 @@ func isAgg(e ast.Expr) (*ast.Agg, error) {
 	if len(call.Args) == 1 {
 		arg = call.Args[0]
 	}
-	return &ast.Agg{
+	var dagArg dag.Expr
+	if arg != nil {
+		var err error
+		dagArg, err = semExpr(scope, arg)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &dag.Agg{
 		Kind: "Agg",
 		Name: call.Name,
-		Expr: arg,
+		Expr: dagArg,
 	}, nil
 }
 
@@ -492,7 +552,7 @@ func deriveAs(scope *Scope, a ast.Assignment) (field.Static, error) {
 	if err != nil {
 		return nil, fmt.Errorf("AS clause of SELECT: %w", err)
 	}
-	f, ok := sa.LHS.(*ast.Path)
+	f, ok := sa.LHS.(*dag.Path)
 	if !ok {
 		return nil, fmt.Errorf("AS clause not a field: %w", err)
 	}
@@ -504,7 +564,7 @@ func sqlField(scope *Scope, e ast.Expr) (field.Static, error) {
 	if err != nil {
 		return nil, err
 	}
-	if f, ok := name.(*ast.Path); ok {
+	if f, ok := name.(*dag.Path); ok {
 		return f.Name, nil
 	}
 	return nil, errors.New("expression is not a field reference")

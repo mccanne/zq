@@ -3,7 +3,7 @@ package index
 import (
 	"fmt"
 
-	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/dag"
 	"github.com/brimdata/zed/expr"
 	"github.com/brimdata/zed/field"
 	"github.com/brimdata/zed/proc"
@@ -138,11 +138,11 @@ func (t *TypeSplitter) Done() {
 	t.parent.Done()
 }
 
-func compile(node ast.Proc, pctx *proc.Context, parent proc.Interface) (proc.Interface, error) {
+func compile(node dag.Op, pctx *proc.Context, parent proc.Interface) (proc.Interface, error) {
 	switch v := node.(type) {
-	case *ast.FieldCutter:
+	case *dag.FieldCutter:
 		return NewFieldCutter(pctx, parent, v.Field, v.Out)
-	case *ast.TypeSplitter:
+	case *dag.TypeSplitter:
 		typ, err := pctx.Zctx.LookupByName(v.TypeName)
 		if err != nil {
 			return nil, err

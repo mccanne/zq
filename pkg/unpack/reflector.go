@@ -20,7 +20,17 @@ func New(templates ...interface{}) Reflector {
 	return r
 }
 
+func (r Reflector) mixIn(other Reflector) Reflector {
+	for k, v := range other {
+		r[k] = v
+	}
+	return r
+}
+
 func (r Reflector) Add(template interface{}) Reflector {
+	if another, ok := template.(Reflector); ok {
+		return r.mixIn(another)
+	}
 	typ := reflect.TypeOf(template)
 	unpackKey, unpackVal, skip, err := structToUnpackRule(typ)
 	if err != nil {

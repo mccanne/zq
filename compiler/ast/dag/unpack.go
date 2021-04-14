@@ -1,4 +1,4 @@
-package ast
+package dag
 
 import (
 	"errors"
@@ -19,13 +19,13 @@ var unpacker = unpack.New(
 	Const{},
 	Cut{},
 	zed.DefValue{},
+	Dot{},
 	Drop{},
 	zed.Enum{},
 	Filter{},
 	Fuse{},
 	Summarize{},
 	Head{},
-	ID{},
 	zed.ImpliedValue{},
 	Join{},
 	zed.Map{},
@@ -33,6 +33,7 @@ var unpacker = unpack.New(
 	Shape{},
 	Parallel{},
 	Pass{},
+	Path{},
 	Pick{},
 	zed.Primitive{},
 	Put{},
@@ -42,15 +43,12 @@ var unpacker = unpack.New(
 	RegexpSearch{},
 	RecordExpr{},
 	Rename{},
-	Root{},
 	Search{},
 	SelectExpr{},
 	SeqExpr{},
 	Sequential{},
 	zed.Set{},
 	SetExpr{},
-	SQLExpr{},
-	SQLOrderBy{},
 	Sort{},
 	Switch{},
 	Tail{},
@@ -78,29 +76,29 @@ func UnpackJSON(buf []byte) (interface{}, error) {
 	return unpacker.UnpackBytes(buf)
 }
 
-// UnpackJSONAsProc transforms a JSON representation of a proc into an ast.Proc.
-func UnpackJSONAsProc(buf []byte) (Proc, error) {
+// UnpackJSONAsOp transforms a JSON representation of an operator into an dag.Op.
+func UnpackJSONAsOp(buf []byte) (Op, error) {
 	result, err := UnpackJSON(buf)
 	if result == nil || err != nil {
 		return nil, err
 	}
-	proc, ok := result.(Proc)
+	op, ok := result.(Op)
 	if !ok {
-		return nil, errors.New("JSON object is not a proc")
+		return nil, errors.New("JSON object is not a DAG operator")
 	}
-	return proc, nil
+	return op, nil
 }
 
-func UnpackMapAsProc(m interface{}) (Proc, error) {
+func UnpackMapAsOp(m interface{}) (Op, error) {
 	object, err := unpacker.UnpackMap(m)
 	if object == nil || err != nil {
 		return nil, err
 	}
-	proc, ok := object.(Proc)
+	op, ok := object.(Op)
 	if !ok {
-		return nil, errors.New("ast.UnpackMapAsProc: not a proc")
+		return nil, errors.New("dag.UnpackMapAsOp: not an Op")
 	}
-	return proc, nil
+	return op, nil
 }
 
 func UnpackMapAsExpr(m interface{}) (Expr, error) {
@@ -110,7 +108,7 @@ func UnpackMapAsExpr(m interface{}) (Expr, error) {
 	}
 	e, ok := object.(Expr)
 	if !ok {
-		return nil, errors.New("ast.UnpackMapAsExpr: not an expression")
+		return nil, errors.New("dag.UnpackMapAsExpr: not an expression")
 	}
 	return e, nil
 }

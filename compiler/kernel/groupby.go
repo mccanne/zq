@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/dag"
 	"github.com/brimdata/zed/expr"
 	"github.com/brimdata/zed/field"
 	"github.com/brimdata/zed/proc"
@@ -12,19 +12,19 @@ import (
 	"github.com/brimdata/zed/zson"
 )
 
-func compileGroupBy(pctx *proc.Context, scope *Scope, parent proc.Interface, node *ast.Summarize) (*groupby.Proc, error) {
-	keys, err := compileAssignments(node.Keys, pctx.Zctx, scope)
+func compileGroupBy(pctx *proc.Context, scope *Scope, parent proc.Interface, summarize *dag.Summarize) (*groupby.Proc, error) {
+	keys, err := compileAssignments(summarize.Keys, pctx.Zctx, scope)
 	if err != nil {
 		return nil, err
 	}
-	names, reducers, err := compileAggs(node.Aggs, scope, pctx.Zctx)
+	names, reducers, err := compileAggs(summarize.Aggs, scope, pctx.Zctx)
 	if err != nil {
 		return nil, err
 	}
-	return groupby.New(pctx, parent, keys, names, reducers, node.Limit, node.InputSortDir, node.PartialsIn, node.PartialsOut)
+	return groupby.New(pctx, parent, keys, names, reducers, summarize.Limit, summarize.InputSortDir, summarize.PartialsIn, summarize.PartialsOut)
 }
 
-func compileAggs(assignments []ast.Assignment, scope *Scope, zctx *zson.Context) ([]field.Static, []*expr.Aggregator, error) {
+func compileAggs(assignments []dag.Assignment, scope *Scope, zctx *zson.Context) ([]field.Static, []*expr.Aggregator, error) {
 	names := make([]field.Static, 0, len(assignments))
 	aggs := make([]*expr.Aggregator, 0, len(assignments))
 	for _, assignment := range assignments {
@@ -38,8 +38,8 @@ func compileAggs(assignments []ast.Assignment, scope *Scope, zctx *zson.Context)
 	return names, aggs, nil
 }
 
-func compileAgg(zctx *zson.Context, scope *Scope, assignment ast.Assignment) (field.Static, *expr.Aggregator, error) {
-	aggAST, ok := assignment.RHS.(*ast.Agg)
+func compileAgg(zctx *zson.Context, scope *Scope, assignment dag.Assignment) (field.Static, *expr.Aggregator, error) {
+	aggAST, ok := assignment.RHS.(*dag.Agg)
 	if !ok {
 		return nil, nil, errors.New("aggregator is not an aggregation expression")
 	}

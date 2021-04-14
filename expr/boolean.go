@@ -10,7 +10,7 @@ import (
 
 	//XXX this shouldn't be reaching into the AST but we'll leave it for
 	// now until we factor-in the flow-based package
-	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/zed"
 	"github.com/brimdata/zed/pkg/byteconv"
 	"github.com/brimdata/zed/zng"
 	"github.com/brimdata/zed/zson"
@@ -393,15 +393,15 @@ func Contains(compare Boolean) Boolean {
 // See the comments of the various type implementations
 // of this method as some types limit the operand to equality and
 // the various types handle coercion in different ways.
-func Comparison(op string, primitive ast.Primitive) (Boolean, error) {
+func Comparison(op string, primitive zed.Primitive) (Boolean, error) {
 	// String literals inside zql are parsed as zng bstrings
 	// (since bstrings can represent a wider range of values,
 	// specifically arrays of bytes that do not correspond to
 	// UTF-8 encoded strings).
 	if primitive.Type == "string" {
-		primitive = ast.Primitive{Kind: "Primitive", Type: "bstring", Text: primitive.Text}
+		primitive = zed.Primitive{Kind: "Primitive", Type: "bstring", Text: primitive.Text}
 	}
-	zv, err := zson.ParsePrimitive(primitive)
+	zv, err := zson.ParsePrimitive(primitive.Type, primitive.Text)
 	if err != nil {
 		return nil, err
 	}

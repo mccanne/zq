@@ -238,16 +238,6 @@ func TestGroupbySystem(t *testing.T) {
 	})
 }
 
-func setSortDir(p ast.Proc, dir int) {
-	//XXX this is fragile.  These tests should use ztest at some point.
-	// It's awkward to set the input sort direction because the tests
-	// are writen at too low a level and what we're really doign here
-	// is saying that the group-by keys are sorted and we should be
-	// using compiler.NewWithSortedInput and passing in the group-by key
-	// for the sortKey.
-	p.(*ast.Sequential).Procs[0].(*ast.Summarize).InputSortDir = dir
-}
-
 func compileGroupBy(code string) (*ast.Summarize, error) {
 	parsed, err := compiler.ParseProc(code)
 	if err != nil {

@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/dag"
+	"github.com/brimdata/zed/compiler/ast/zed"
 	"github.com/brimdata/zed/field"
 	"github.com/brimdata/zed/pkg/nano"
 )
@@ -14,40 +16,52 @@ import (
 // object.  Currently, it only replaces the group-by duration with
 // a truncation call on the ts and replaces FunctionCall's in proc context
 // with either a group-by or filter-proc based on the function's name.
-func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
+func semProc(scope *Scope, p ast.Proc) (dag.Op, error) {
 	switch p := p.(type) {
 	case *ast.Summarize:
-		keys := p.Keys
+		keys, err := semAssignments(scope, p.Keys)
+		if err != nil {
+			return nil, err
+		}
 		if duration := p.Duration; duration != nil {
 			d, err := nano.ParseDuration(duration.Text)
 			if err != nil {
 				return nil, err
 			}
-			durationKey := ast.Assignment{
+			durationKey := dag.Assignment{
 				Kind: "Assignment",
-				LHS:  ast.NewDotExpr(field.New("ts")),
-				RHS: &ast.Call{
+				LHS: &dag.Path{
+					Kind: "Path",
+					Name: field.New("ts"),
+				},
+				RHS: &dag.Call{
 					Kind: "Call",
 					Name: "trunc",
-					Args: []ast.Expr{
-						ast.NewDotExpr(field.New("ts")),
-						&ast.Primitive{
+					Args: []dag.Expr{
+						&dag.Path{
+							Kind: "Path",
+							Name: field.New("ts"),
+						},
+						&zed.Primitive{
 							Kind: "Primitive",
 							Type: "duration",
 							Text: d.String(),
 						}},
 				},
 			}
-			keys = append([]ast.Assignment{durationKey}, keys...)
-		}
-		var err error
-		keys, err = semAssignments(scope, keys)
-		if err != nil {
-			return nil, err
+			keys = append([]dag.Assignment{durationKey}, keys...)
 		}
 		aggs, err := semAssignments(scope, p.Aggs)
 		if err != nil {
 			return nil, err
+		}
+		var dur *zed.Primitive
+		if p.Duration != nil {
+			dur = &zed.Primitive{
+				Kind: "Primitive",
+				Type: p.Duration.Type,
+				Text: p.Duration.Text,
+			}
 		}
 		// Note: InputSortDir is copied in here but it's not meaningful
 		// coming from a parser AST, only from a worker using the kernel DSL,
@@ -60,18 +74,15 @@ func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
 		// separation... see issue #2163.  Also, we copy Duration even though
 		// above we changed duration to the a trunc(ts) group-by key as the
 		// Duration field is used later by the parallelization operator.
-		return &ast.Summarize{
-			Kind:         "Summarize",
-			Duration:     p.Duration,
-			InputSortDir: p.InputSortDir,
-			Limit:        p.Limit,
-			Keys:         keys,
-			Aggs:         aggs,
-			PartialsIn:   p.PartialsIn,
-			PartialsOut:  p.PartialsOut,
+		return &dag.Summarize{
+			Kind:     "Summarize",
+			Duration: dur,
+			Limit:    p.Limit,
+			Keys:     keys,
+			Aggs:     aggs,
 		}, nil
 	case *ast.Parallel:
-		var procs []ast.Proc
+		var ops []dag.Op
 		for _, p := range p.Procs {
 			if isConst(p) {
 				continue
@@ -80,16 +91,16 @@ func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
 			if err != nil {
 				return nil, err
 			}
-			procs = append(procs, converted)
+			ops = append(ops, converted)
 		}
-		return &ast.Parallel{
+		return &dag.Parallel{
 			Kind:         "Parallel",
 			MergeBy:      p.MergeBy,
 			MergeReverse: p.MergeReverse,
-			Procs:        procs,
+			Ops:          ops,
 		}, nil
 	case *ast.Sequential:
-		var procs []ast.Proc
+		var ops []dag.Op
 		for _, p := range p.Procs {
 			if isConst(p) {
 				continue
@@ -98,14 +109,14 @@ func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
 			if err != nil {
 				return nil, err
 			}
-			procs = append(procs, converted)
+			ops = append(ops, converted)
 		}
-		return &ast.Sequential{
-			Kind:  "Sequential",
-			Procs: procs,
+		return &dag.Sequential{
+			Kind: "Sequential",
+			Ops:  ops,
 		}, nil
 	case *ast.Switch:
-		var cases []ast.Case
+		var cases []dag.Case
 		for k := range p.Cases {
 			var err error
 			tr, err := semProc(scope, p.Cases[k].Proc)
@@ -116,28 +127,22 @@ func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
 			if err != nil {
 				return nil, err
 			}
-			cases = append(cases, ast.Case{Expr: e, Proc: tr})
+			cases = append(cases, dag.Case{Expr: e, Op: tr})
 		}
-		return &ast.Switch{
-			Kind:         "Switch",
-			Cases:        cases,
-			MergeBy:      p.MergeBy,
-			MergeReverse: p.MergeReverse,
+		return &dag.Switch{
+			Kind:  "Switch",
+			Cases: cases,
 		}, nil
 	case *ast.Call:
-		converted, err := convertFunctionProc(p)
-		if err != nil {
-			return nil, err
-		}
-		return semProc(scope, converted)
+		return convertFunctionProc(scope, p)
 	case *ast.Shape:
-		return p, nil
+		return &dag.Shape{"Shape"}, nil
 	case *ast.Cut:
 		assignments, err := semAssignments(scope, p.Args)
 		if err != nil {
 			return nil, err
 		}
-		return &ast.Cut{
+		return &dag.Cut{
 			Kind: "Cut",
 			Args: assignments,
 		}, nil
@@ -146,7 +151,7 @@ func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &ast.Pick{
+		return &dag.Pick{
 			Kind: "Pick",
 			Args: assignments,
 		}, nil
@@ -158,7 +163,7 @@ func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
 		if len(args) == 0 {
 			return nil, errors.New("drop: no fields given")
 		}
-		return &ast.Drop{
+		return &dag.Drop{
 			Kind: "Drop",
 			Args: args,
 		}, nil
@@ -167,7 +172,7 @@ func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
 		if err != nil {
 			return nil, fmt.Errorf("sort: %w", err)
 		}
-		return &ast.Sort{
+		return &dag.Sort{
 			Kind:       "Sort",
 			Args:       exprs,
 			SortDir:    p.SortDir,
@@ -178,7 +183,7 @@ func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
 		if limit == 0 {
 			limit = 1
 		}
-		return &ast.Head{
+		return &dag.Head{
 			Kind:  "Head",
 			Count: limit,
 		}, nil
@@ -187,23 +192,23 @@ func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
 		if limit == 0 {
 			limit = 1
 		}
-		return &ast.Tail{
+		return &dag.Tail{
 			Kind:  "Tail",
 			Count: limit,
 		}, nil
 	case *ast.Uniq:
-		return &ast.Uniq{
+		return &dag.Uniq{
 			Kind:  "Uniq",
 			Cflag: p.Cflag,
 		}, nil
 	case *ast.Pass:
-		return p, nil
+		return &dag.Pass{"Pass"}, nil
 	case *ast.Filter:
 		e, err := semExpr(scope, p.Expr)
 		if err != nil {
 			return nil, err
 		}
-		return &ast.Filter{
+		return &dag.Filter{
 			Kind: "Filter",
 			Expr: e,
 		}, nil
@@ -215,7 +220,7 @@ func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
 		if len(args) == 0 {
 			return nil, errors.New("top: no arguments given")
 		}
-		return &ast.Top{
+		return &dag.Top{
 			Kind:  "Top",
 			Args:  args,
 			Flush: p.Flush,
@@ -226,12 +231,12 @@ func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &ast.Put{
+		return &dag.Put{
 			Kind: "Put",
 			Args: assignments,
 		}, nil
 	case *ast.Rename:
-		var assignments []ast.Assignment
+		var assignments []dag.Assignment
 		for _, fa := range p.Args {
 			dst, err := semField(scope, fa.LHS)
 			if err != nil {
@@ -241,11 +246,11 @@ func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
 			if err != nil {
 				return nil, err
 			}
-			dstField, ok := dst.(*ast.Path)
+			dstField, ok := dst.(*dag.Path)
 			if !ok {
 				return nil, errors.New("'rename' requires explicit field references")
 			}
-			srcField, ok := src.(*ast.Path)
+			srcField, ok := src.(*dag.Path)
 			if !ok {
 				return nil, errors.New("'rename' requires explicit field references")
 			}
@@ -259,14 +264,14 @@ func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
 					return nil, fmt.Errorf("cannot rename %s to %s (differ in %s vs %s)", srcField, dstField, srcField.Name[i], dstField.Name[i])
 				}
 			}
-			assignments = append(assignments, ast.Assignment{"Assignment", dst, src})
+			assignments = append(assignments, dag.Assignment{"Assignment", dst, src})
 		}
-		return &ast.Rename{
+		return &dag.Rename{
 			Kind: "Rename",
 			Args: assignments,
 		}, nil
 	case *ast.Fuse:
-		return p, nil
+		return &dag.Fuse{"Fuse"}, nil
 	case *ast.Join:
 		leftKey, err := semExpr(scope, p.LeftKey)
 		if err != nil {
@@ -280,7 +285,7 @@ func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &ast.Join{
+		return &dag.Join{
 			Kind:     "Join",
 			Style:    p.Style,
 			LeftKey:  leftKey,
@@ -297,15 +302,24 @@ func semProc(scope *Scope, p ast.Proc) (ast.Proc, error) {
 		if converted == nil {
 			return nil, errors.New("unable to covert SQL expression to Z")
 		}
-		return semProc(scope, converted)
-
-	case *ast.FieldCutter, *ast.TypeSplitter:
-		return p, nil
+		return converted, nil
+	case *ast.FieldCutter:
+		return &dag.FieldCutter{
+			Kind:  "FieldCutter",
+			Field: p.Field,
+			Out:   p.Out,
+		}, nil
+	case *ast.TypeSplitter:
+		return &dag.TypeSplitter{
+			Kind:     "TypeSplitter",
+			Key:      p.Key,
+			TypeName: p.TypeName,
+		}, nil
 	}
 	return nil, fmt.Errorf("semantic transform: unknown AST type: %v", p)
 }
 
-func semConsts(consts []ast.Proc, scope *Scope, p ast.Proc) ([]ast.Proc, error) {
+func semConsts(consts []dag.Op, scope *Scope, p ast.Proc) ([]dag.Op, error) {
 	switch p := p.(type) {
 	case *ast.Sequential:
 		for _, p := range p.Procs {
@@ -328,7 +342,7 @@ func semConsts(consts []ast.Proc, scope *Scope, p ast.Proc) ([]ast.Proc, error) 
 		if err != nil {
 			return nil, err
 		}
-		converted := &ast.TypeProc{
+		converted := &dag.TypeProc{
 			Kind: "TypeProc",
 			Name: p.Name,
 			Type: typ,
@@ -340,7 +354,7 @@ func semConsts(consts []ast.Proc, scope *Scope, p ast.Proc) ([]ast.Proc, error) 
 		if err != nil {
 			return nil, err
 		}
-		converted := &ast.Const{
+		converted := &dag.Const{
 			Kind: "Const",
 			Name: p.Name,
 			Expr: e,

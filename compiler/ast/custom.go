@@ -16,11 +16,11 @@ type FieldCutter struct {
 	Out   field.Static
 }
 
-func (*FieldCutter) ProcNode() {}
+func (*FieldCutter) ProcAST() {}
 
 type TypeSplitter struct {
 	Key      field.Static
 	TypeName string
 }
 
-func (t *TypeSplitter) ProcNode() {}
+func (t *TypeSplitter) ProcAST() {}

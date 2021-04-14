@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net"
 
-	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/zed"
 	"github.com/brimdata/zed/pkg/byteconv"
 	"github.com/brimdata/zed/pkg/nano"
 	"github.com/brimdata/zed/zcode"
@@ -281,12 +281,12 @@ func ParseValue(typ zng.Type, in []byte) (zcode.Bytes, error) {
 	case *zng.TypeOfTime:
 		return ParseTime(in)
 	default:
-		primitive := ast.Primitive{
+		primitive := zed.Primitive{
 			Kind: "Primitive",
 			Type: typ.ZSON(),
 			Text: string(in),
 		}
-		zv, err := zson.ParsePrimitive(primitive)
+		zv, err := zson.ParsePrimitive(primitive.Type, primitive.Text)
 		if err != nil {
 			return nil, err
 		}

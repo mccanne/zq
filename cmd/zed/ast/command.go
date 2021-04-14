@@ -13,6 +13,7 @@ import (
 
 	"github.com/brimdata/zed/compiler"
 	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/dag"
 	"github.com/brimdata/zed/compiler/parser"
 	"github.com/brimdata/zed/field"
 	"github.com/brimdata/zed/pkg/charm"
@@ -182,7 +183,7 @@ func (c *Command) parse(z string) error {
 			return err
 		}
 		c.header("semantic")
-		c.writeProc(runtime.Entry())
+		c.writeOp(runtime.Entry())
 	}
 	if c.filter {
 		runtime, err := c.compile(z)
@@ -193,7 +194,7 @@ func (c *Command) parse(z string) error {
 			return err
 		}
 		c.header("lifted filter")
-		c.writeProc(runtime.AsProc())
+		c.writeOp(runtime.AsProc())
 	}
 	if c.optimize {
 		runtime, err := c.compile(z)
@@ -204,7 +205,7 @@ func (c *Command) parse(z string) error {
 			return err
 		}
 		c.header("optimized")
-		c.writeProc(runtime.Entry())
+		c.writeOp(runtime.Entry())
 	}
 	if c.parallel > 0 {
 		runtime, err := c.compile(z)
@@ -218,13 +219,22 @@ func (c *Command) parse(z string) error {
 			return errors.New("parallellize failed")
 		}
 		c.header("parallelized")
-		c.writeProc(runtime.Entry())
+		c.writeOp(runtime.Entry())
 	}
 	return nil
 }
 
 func (c *Command) writeProc(p ast.Proc) {
 	s, err := procFmt(p, c.canon)
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println(s)
+	}
+}
+
+func (c *Command) writeOp(op dag.Op) {
+	s, err := dagFmt(op, c.canon)
 	if err != nil {
 		fmt.Println(err)
 	} else {
@@ -298,13 +308,24 @@ func parsePEGjs(z string) (string, error) {
 
 func procFmt(proc ast.Proc, canon bool) (string, error) {
 	if canon {
-		return zfmt.Canonical(proc), nil
+		return zfmt.AST(proc), nil
 	}
 	procJSON, err := json.Marshal(proc)
 	if err != nil {
 		return "", err
 	}
 	return normalize(procJSON)
+}
+
+func dagFmt(op dag.Op, canon bool) (string, error) {
+	if canon {
+		return zfmt.DAG(op), nil
+	}
+	dagJSON, err := json.Marshal(op)
+	if err != nil {
+		return "", err
+	}
+	return normalize(dagJSON)
 }
 
 func parsePigeon(z string) (string, error) {

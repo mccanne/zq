@@ -14,6 +14,7 @@ import (
 
 	"github.com/brimdata/zed/compiler"
 	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/zed"
 	"github.com/brimdata/zed/compiler/parser"
 	"github.com/brimdata/zed/pkg/fs"
 	"github.com/brimdata/zed/ztest"
@@ -134,7 +135,7 @@ func parseString(in string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("Expected BinaryExpr got %T", filt.Expr)
 	}
-	p, ok := comp.RHS.(*ast.Primitive)
+	p, ok := comp.RHS.(*zed.Primitive)
 	if !ok {
 		return "", fmt.Errorf("Expected Primitive got %T", filt.Expr)
 	}

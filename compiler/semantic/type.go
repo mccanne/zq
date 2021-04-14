@@ -3,14 +3,15 @@ package semantic
 import (
 	"encoding/json"
 
-	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/dag"
+	"github.com/brimdata/zed/compiler/ast/zed"
 )
 
-func semType(scope *Scope, typ ast.Type) (ast.Type, error) {
+func semType(scope *Scope, typ zed.Type) (zed.Type, error) {
 	return copyType(typ), nil
 }
 
-func copyType(t ast.Type) ast.Type {
+func copyType(t zed.Type) zed.Type {
 	if t == nil {
 		panic("copyType nil")
 	}
@@ -18,11 +19,11 @@ func copyType(t ast.Type) ast.Type {
 	if err != nil {
 		panic(err)
 	}
-	copy, err := ast.UnpackJSON(b)
+	copy, err := dag.UnpackJSON(b)
 	if err != nil {
 		panic(err)
 	}
-	typ, ok := copy.(ast.Type)
+	typ, ok := copy.(zed.Type)
 	if !ok {
 		panic("copyType not a type")
 	}

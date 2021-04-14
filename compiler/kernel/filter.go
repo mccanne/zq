@@ -3,16 +3,17 @@ package kernel
 import (
 	"fmt"
 
-	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/dag"
+	"github.com/brimdata/zed/compiler/ast/zed"
 	"github.com/brimdata/zed/expr"
 	"github.com/brimdata/zed/zio/tzngio"
 	"github.com/brimdata/zed/zng"
 	"github.com/brimdata/zed/zson"
 )
 
-func compileCompareField(zctx *zson.Context, scope *Scope, e *ast.BinaryExpr) (expr.Filter, error) {
+func compileCompareField(zctx *zson.Context, scope *Scope, e *dag.BinaryExpr) (expr.Filter, error) {
 	if e.Op == "in" {
-		literal, ok := e.LHS.(*ast.Primitive)
+		literal, ok := e.LHS.(*zed.Primitive)
 		if !ok {
 			// XXX If the RHS here is a literal container or a subnet,
 			// we should optimize this case.  This is part of
@@ -31,7 +32,7 @@ func compileCompareField(zctx *zson.Context, scope *Scope, e *ast.BinaryExpr) (e
 		comparison := expr.Contains(eql)
 		return expr.Apply(resolver, comparison), nil
 	}
-	literal, ok := e.RHS.(*ast.Primitive)
+	literal, ok := e.RHS.(*zed.Primitive)
 	if !ok {
 		return nil, nil
 	}
@@ -53,7 +54,7 @@ func compileCompareField(zctx *zson.Context, scope *Scope, e *ast.BinaryExpr) (e
 	return expr.Apply(resolver, comparison), nil
 }
 
-func compileSearch(node *ast.Search) (expr.Filter, error) {
+func compileSearch(node *dag.Search) (expr.Filter, error) {
 	if node.Value.Type == "net" {
 		match, err := expr.Comparison("=", node.Value)
 		if err != nil {
@@ -78,9 +79,9 @@ func compileSearch(node *ast.Search) (expr.Filter, error) {
 	return expr.SearchRecordOther(node.Text, node.Value)
 }
 
-func CompileFilter(zctx *zson.Context, scope *Scope, node ast.Expr) (expr.Filter, error) {
+func CompileFilter(zctx *zson.Context, scope *Scope, node dag.Expr) (expr.Filter, error) {
 	switch v := node.(type) {
-	case *ast.RegexpMatch:
+	case *dag.RegexpMatch:
 		e, err := compileExpr(zctx, scope, v.Expr)
 		if err != nil {
 			return nil, err
@@ -92,7 +93,7 @@ func CompileFilter(zctx *zson.Context, scope *Scope, node ast.Expr) (expr.Filter
 		pred := expr.NewRegexpBoolean(re)
 		return expr.Apply(e, pred), nil
 
-	case *ast.RegexpSearch:
+	case *dag.RegexpSearch:
 		re, err := expr.CompileRegexp(v.Pattern)
 		if err != nil {
 			return nil, err
@@ -104,7 +105,7 @@ func CompileFilter(zctx *zson.Context, scope *Scope, node ast.Expr) (expr.Filter
 		}
 		return expr.EvalAny(pred, true), nil
 
-	case *ast.UnaryExpr:
+	case *dag.UnaryExpr:
 		if v.Op != "!" {
 			return nil, fmt.Errorf("unknown unary operator: %s", v.Op)
 		}
@@ -114,10 +115,10 @@ func CompileFilter(zctx *zson.Context, scope *Scope, node ast.Expr) (expr.Filter
 		}
 		return expr.LogicalNot(e), nil
 
-	case *ast.Primitive:
+	case *zed.Primitive:
 		// This literal translation should happen elsewhere will
 		// be fixed when we add ZSON literals to Z, e.g.,
-		// ast.Literal.AsBool() etc methods.
+		// dag.Literal.AsBool() etc methods.
 		if v.Type != "bool" {
 			return nil, fmt.Errorf("bad literal type in filter compiler: %s", v.Type)
 		}
@@ -127,14 +128,14 @@ func CompileFilter(zctx *zson.Context, scope *Scope, node ast.Expr) (expr.Filter
 			b = true
 		case "false":
 		default:
-			return nil, fmt.Errorf("bad boolean value in ast.Literal: %s", v.Text)
+			return nil, fmt.Errorf("bad boolean value in dag.Literal: %s", v.Text)
 		}
 		return func(*zng.Record) bool { return b }, nil
 
-	case *ast.Search:
+	case *dag.Search:
 		return compileSearch(v)
 
-	case *ast.BinaryExpr:
+	case *dag.BinaryExpr:
 		if v.Op == "and" {
 			left, err := CompileFilter(zctx, scope, v.LHS)
 			if err != nil {
@@ -162,9 +163,9 @@ func CompileFilter(zctx *zson.Context, scope *Scope, node ast.Expr) (expr.Filter
 		}
 		return compileExprPredicate(zctx, scope, v)
 
-	case *ast.Call:
+	case *dag.Call:
 		return compileExprPredicate(zctx, scope, v)
-	case *ast.SeqExpr:
+	case *dag.SeqExpr:
 		if f, err := compileCompareAny(v); f != nil || err != nil {
 			return f, err
 		}
@@ -175,7 +176,7 @@ func CompileFilter(zctx *zson.Context, scope *Scope, node ast.Expr) (expr.Filter
 	}
 }
 
-func compileExprPredicate(zctx *zson.Context, scope *Scope, e ast.Expr) (expr.Filter, error) {
+func compileExprPredicate(zctx *zson.Context, scope *Scope, e dag.Expr) (expr.Filter, error) {
 	predicate, err := compileExpr(zctx, scope, e)
 	if err != nil {
 		return nil, err
@@ -192,7 +193,7 @@ func compileExprPredicate(zctx *zson.Context, scope *Scope, e ast.Expr) (expr.Fi
 	}, nil
 }
 
-func compileCompareAny(e *ast.SeqExpr) (expr.Filter, error) {
+func compileCompareAny(e *dag.SeqExpr) (expr.Filter, error) {
 	literal, op, ok := isCompareAny(e)
 	if !ok {
 		return nil, nil

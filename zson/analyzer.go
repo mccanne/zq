@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/zed"
 	"github.com/brimdata/zed/zng"
 )
 
@@ -80,7 +80,7 @@ func (m *Map) SetType(t zng.Type)       { m.Type = t }
 func (n *Null) SetType(t zng.Type)      { n.Type = t }
 func (t *TypeValue) SetType(T zng.Type) { t.Type = T }
 
-// An Analyzer transforms an ast.Value (which has decentralized type decorators)
+// An Analyzer transforms an zed.Value (which has decentralized type decorators)
 // to a typed Value, where every component of a nested Value is explicitly typed.
 // This is done via a semantic analysis where type state flows both down a the
 // nested value hierarchy (via type decorators) and back up via fully typed value
@@ -93,15 +93,15 @@ func NewAnalyzer() Analyzer {
 	return Analyzer(make(map[string]zng.Type))
 }
 
-func (a Analyzer) ConvertValue(zctx *Context, val ast.Value) (Value, error) {
+func (a Analyzer) ConvertValue(zctx *Context, val zed.Value) (Value, error) {
 	return a.convertValue(zctx, val, nil)
 }
 
-func (a Analyzer) convertValue(zctx *Context, val ast.Value, parent zng.Type) (Value, error) {
+func (a Analyzer) convertValue(zctx *Context, val zed.Value, parent zng.Type) (Value, error) {
 	switch val := val.(type) {
-	case *ast.ImpliedValue:
+	case *zed.ImpliedValue:
 		return a.convertAny(zctx, val.Of, parent)
-	case *ast.DefValue:
+	case *zed.DefValue:
 		v, err := a.convertAny(zctx, val.Of, parent)
 		if err != nil {
 			return nil, err
@@ -114,7 +114,7 @@ func (a Analyzer) convertValue(zctx *Context, val ast.Value, parent zng.Type) (V
 			v.SetType(alias)
 		}
 		return v, nil
-	case *ast.CastValue:
+	case *zed.CastValue:
 		cast, err := a.convertType(zctx, val.Type)
 		if err != nil {
 			return nil, err
@@ -159,7 +159,7 @@ func (a Analyzer) enterTypeDef(zctx *Context, name string, typ zng.Type) (*zng.T
 	return alias, nil
 }
 
-func (a Analyzer) convertAny(zctx *Context, val ast.Any, cast zng.Type) (Value, error) {
+func (a Analyzer) convertAny(zctx *Context, val zed.Any, cast zng.Type) (Value, error) {
 	// If we're casting something to a union, then the thing inside needs to
 	// describe itself and we can convert the inner value to a union value when
 	// we know its type (so we can code the selector).
@@ -171,25 +171,25 @@ func (a Analyzer) convertAny(zctx *Context, val ast.Any, cast zng.Type) (Value, 
 		return a.convertUnion(zctx, v, union, cast)
 	}
 	switch val := val.(type) {
-	case *ast.Primitive:
+	case *zed.Primitive:
 		return a.convertPrimitive(zctx, val, cast)
-	case *ast.Record:
+	case *zed.Record:
 		return a.convertRecord(zctx, val, cast)
-	case *ast.Array:
+	case *zed.Array:
 		return a.convertArray(zctx, val, cast)
-	case *ast.Set:
+	case *zed.Set:
 		return a.convertSet(zctx, val, cast)
-	case *ast.Enum:
+	case *zed.Enum:
 		return a.convertEnum(zctx, val, cast)
-	case *ast.Map:
+	case *zed.Map:
 		return a.convertMap(zctx, val, cast)
-	case *ast.TypeValue:
+	case *zed.TypeValue:
 		return a.convertTypeValue(zctx, val, cast)
 	}
 	return nil, fmt.Errorf("internal error: unknown ast type in Analyzer.convertAny(): %T", val)
 }
 
-func (a Analyzer) convertPrimitive(zctx *Context, val *ast.Primitive, cast zng.Type) (Value, error) {
+func (a Analyzer) convertPrimitive(zctx *Context, val *zed.Primitive, cast zng.Type) (Value, error) {
 	typ := zng.LookupPrimitive(val.Type)
 	if typ == nil {
 		return nil, fmt.Errorf("no such primitive type: %q", val.Type)
@@ -214,7 +214,7 @@ func (a Analyzer) convertPrimitive(zctx *Context, val *ast.Primitive, cast zng.T
 	return &Primitive{Type: typ, Text: val.Text}, nil
 }
 
-func stringToEnum(val *ast.Primitive, cast zng.Type) Value {
+func stringToEnum(val *zed.Primitive, cast zng.Type) Value {
 	if enum, ok := cast.(*zng.TypeEnum); ok {
 		if val.Type == "string" {
 			return &Enum{
@@ -237,7 +237,7 @@ func castType(typ, cast zng.Type) (zng.Type, error) {
 	return nil, fmt.Errorf("type mismatch: %q cannot be used as %q", typ.ZSON(), cast.ZSON())
 }
 
-func (a Analyzer) convertRecord(zctx *Context, val *ast.Record, cast zng.Type) (Value, error) {
+func (a Analyzer) convertRecord(zctx *Context, val *zed.Record, cast zng.Type) (Value, error) {
 	var fields []Value
 	var err error
 	if cast != nil {
@@ -265,7 +265,7 @@ func (a Analyzer) convertRecord(zctx *Context, val *ast.Record, cast zng.Type) (
 	}, nil
 }
 
-func (a Analyzer) convertFields(zctx *Context, in []ast.Field, cols []zng.Column) ([]Value, error) {
+func (a Analyzer) convertFields(zctx *Context, in []zed.Field, cols []zng.Column) ([]Value, error) {
 	fields := make([]Value, 0, len(in))
 	for k, f := range in {
 		var cast zng.Type
@@ -281,7 +281,7 @@ func (a Analyzer) convertFields(zctx *Context, in []ast.Field, cols []zng.Column
 	return fields, nil
 }
 
-func lookupRecordType(zctx *Context, fields []ast.Field, vals []Value) (*zng.TypeRecord, error) {
+func lookupRecordType(zctx *Context, fields []zed.Field, vals []Value) (*zng.TypeRecord, error) {
 	columns := make([]zng.Column, 0, len(fields))
 	for k, f := range fields {
 		columns = append(columns, zng.Column{f.Name, vals[k].TypeOf()})
@@ -300,7 +300,7 @@ func arrayElemCast(cast zng.Type) (zng.Type, error) {
 	return nil, errors.New("array decorator not of type array")
 }
 
-func (a Analyzer) convertArray(zctx *Context, array *ast.Array, cast zng.Type) (Value, error) {
+func (a Analyzer) convertArray(zctx *Context, array *zed.Array, cast zng.Type) (Value, error) {
 	vals := make([]Value, 0, len(array.Elements))
 	typ, err := arrayElemCast(cast)
 	if err != nil {
@@ -405,7 +405,7 @@ func differentTypes(vals []Value) []zng.Type {
 	return out
 }
 
-func (a Analyzer) convertSet(zctx *Context, set *ast.Set, cast zng.Type) (Value, error) {
+func (a Analyzer) convertSet(zctx *Context, set *zed.Set, cast zng.Type) (Value, error) {
 	var elemType zng.Type
 	if cast != nil {
 		setType, ok := zng.AliasOf(cast).(*zng.TypeSet)
@@ -461,7 +461,7 @@ func (a Analyzer) convertUnion(zctx *Context, v Value, union *zng.TypeUnion, cas
 	return nil, fmt.Errorf("type %q is not in union type %q", valType.ZSON(), union.ZSON())
 }
 
-func (a Analyzer) convertEnum(zctx *Context, val *ast.Enum, cast zng.Type) (Value, error) {
+func (a Analyzer) convertEnum(zctx *Context, val *zed.Enum, cast zng.Type) (Value, error) {
 	if cast == nil {
 		return nil, fmt.Errorf("identifier %q must be enum and requires decorator", val.Name)
 	}
@@ -481,7 +481,7 @@ func (a Analyzer) convertEnum(zctx *Context, val *ast.Enum, cast zng.Type) (Valu
 	return nil, fmt.Errorf("identifier %q not a member of enum type %q", val.Name, enum.ZSON())
 }
 
-func (a Analyzer) convertMap(zctx *Context, m *ast.Map, cast zng.Type) (Value, error) {
+func (a Analyzer) convertMap(zctx *Context, m *zed.Map, cast zng.Type) (Value, error) {
 	var keyType, valType zng.Type
 	if cast != nil {
 		typ, ok := zng.AliasOf(cast).(*zng.TypeMap)
@@ -522,7 +522,7 @@ func (a Analyzer) convertMap(zctx *Context, m *ast.Map, cast zng.Type) (Value, e
 	}, nil
 }
 
-func (a Analyzer) convertTypeValue(zctx *Context, tv *ast.TypeValue, cast zng.Type) (Value, error) {
+func (a Analyzer) convertTypeValue(zctx *Context, tv *zed.TypeValue, cast zng.Type) (Value, error) {
 	if cast != nil {
 		if _, ok := zng.AliasOf(cast).(*zng.TypeOfType); !ok {
 			return nil, fmt.Errorf("cannot apply decorator (%q) to a type value", cast.ZSON())
@@ -541,16 +541,16 @@ func (a Analyzer) convertTypeValue(zctx *Context, tv *ast.TypeValue, cast zng.Ty
 	}, nil
 }
 
-func (a Analyzer) convertType(zctx *Context, typ ast.Type) (zng.Type, error) {
+func (a Analyzer) convertType(zctx *Context, typ zed.Type) (zng.Type, error) {
 	switch t := typ.(type) {
-	case *ast.TypePrimitive:
+	case *zed.TypePrimitive:
 		name := t.Name
 		typ := zng.LookupPrimitive(name)
 		if typ == nil {
 			return nil, fmt.Errorf("no such primitive type: %q", name)
 		}
 		return typ, nil
-	case *ast.TypeDef:
+	case *zed.TypeDef:
 		typ, err := a.convertType(zctx, t.Type)
 		if err != nil {
 			return nil, err
@@ -563,27 +563,27 @@ func (a Analyzer) convertType(zctx *Context, typ ast.Type) (zng.Type, error) {
 			typ = alias
 		}
 		return typ, nil
-	case *ast.TypeRecord:
+	case *zed.TypeRecord:
 		return a.convertTypeRecord(zctx, t)
-	case *ast.TypeArray:
+	case *zed.TypeArray:
 		typ, err := a.convertType(zctx, t.Type)
 		if err != nil {
 			return nil, err
 		}
 		return zctx.LookupTypeArray(typ), nil
-	case *ast.TypeSet:
+	case *zed.TypeSet:
 		typ, err := a.convertType(zctx, t.Type)
 		if err != nil {
 			return nil, err
 		}
 		return zctx.LookupTypeSet(typ), nil
-	case *ast.TypeMap:
+	case *zed.TypeMap:
 		return a.convertTypeMap(zctx, t)
-	case *ast.TypeUnion:
+	case *zed.TypeUnion:
 		return a.convertTypeUnion(zctx, t)
-	case *ast.TypeEnum:
+	case *zed.TypeEnum:
 		return a.convertTypeEnum(zctx, t)
-	case *ast.TypeName:
+	case *zed.TypeName:
 		typ, ok := a[t.Name]
 		if !ok {
 			// We avoid the nil-interface bug here by assigning to alias
@@ -600,7 +600,7 @@ func (a Analyzer) convertType(zctx *Context, typ ast.Type) (zng.Type, error) {
 	return nil, fmt.Errorf("unknown type in Analyzer.convertType: %T", typ)
 }
 
-func (a Analyzer) convertTypeRecord(zctx *Context, typ *ast.TypeRecord) (*zng.TypeRecord, error) {
+func (a Analyzer) convertTypeRecord(zctx *Context, typ *zed.TypeRecord) (*zng.TypeRecord, error) {
 	fields := typ.Fields
 	columns := make([]zng.Column, 0, len(fields))
 	for _, f := range fields {
@@ -613,7 +613,7 @@ func (a Analyzer) convertTypeRecord(zctx *Context, typ *ast.TypeRecord) (*zng.Ty
 	return zctx.LookupTypeRecord(columns)
 }
 
-func (a Analyzer) convertTypeMap(zctx *Context, tmap *ast.TypeMap) (*zng.TypeMap, error) {
+func (a Analyzer) convertTypeMap(zctx *Context, tmap *zed.TypeMap) (*zng.TypeMap, error) {
 	keyType, err := a.convertType(zctx, tmap.KeyType)
 	if err != nil {
 		return nil, err
@@ -625,7 +625,7 @@ func (a Analyzer) convertTypeMap(zctx *Context, tmap *ast.TypeMap) (*zng.TypeMap
 	return zctx.LookupTypeMap(keyType, valType), nil
 }
 
-func (a Analyzer) convertTypeUnion(zctx *Context, union *ast.TypeUnion) (*zng.TypeUnion, error) {
+func (a Analyzer) convertTypeUnion(zctx *Context, union *zed.TypeUnion) (*zng.TypeUnion, error) {
 	var types []zng.Type
 	for _, typ := range union.Types {
 		typ, err := a.convertType(zctx, typ)
@@ -637,7 +637,7 @@ func (a Analyzer) convertTypeUnion(zctx *Context, union *ast.TypeUnion) (*zng.Ty
 	return zctx.LookupTypeUnion(types), nil
 }
 
-func (a Analyzer) convertTypeEnum(zctx *Context, enum *ast.TypeEnum) (*zng.TypeEnum, error) {
+func (a Analyzer) convertTypeEnum(zctx *Context, enum *zed.TypeEnum) (*zng.TypeEnum, error) {
 	n := len(enum.Elements)
 	if n == 0 {
 		return nil, errors.New("enum body is empty")

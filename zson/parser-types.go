@@ -3,13 +3,11 @@ package zson
 import (
 	"unicode"
 
-	// XXX should move ZSON ast into zson/ast. it's a bit different
-	// than Z literals so it deserves its own home.
-	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/zed"
 	"github.com/brimdata/zed/zng"
 )
 
-func (p *Parser) parseType() (ast.Type, error) {
+func (p *Parser) parseType() (zed.Type, error) {
 	typ, err := p.matchType()
 	if typ == nil && err == nil {
 		err = p.error("couldn't parse type")
@@ -17,7 +15,7 @@ func (p *Parser) parseType() (ast.Type, error) {
 	return typ, err
 }
 
-func (p *Parser) matchType() (ast.Type, error) {
+func (p *Parser) matchType() (zed.Type, error) {
 	if typ, err := p.matchTypeName(); typ != nil || err != nil {
 		return typ, err
 	}
@@ -52,7 +50,7 @@ func (p *Parser) matchIdentifier() (string, error) {
 	return l.scanIdentifier()
 }
 
-func (p *Parser) matchTypeName() (ast.Type, error) {
+func (p *Parser) matchTypeName() (zed.Type, error) {
 	l := p.lexer
 	if err := l.skipSpace(); err != nil {
 		return nil, err
@@ -69,12 +67,12 @@ func (p *Parser) matchTypeName() (ast.Type, error) {
 		return nil, err
 	}
 	if t := zng.LookupPrimitive(name); t != nil {
-		return &ast.TypePrimitive{"TypePrimitive", name}, nil
+		return &zed.TypePrimitive{"TypePrimitive", name}, nil
 	}
 	// Wherever we have a type name, we can have a type def defining the
 	// type name.
 	if ok, err := l.match('='); !ok || err != nil {
-		return &ast.TypeName{"TypeName", name}, nil
+		return &zed.TypeName{"TypeName", name}, nil
 	}
 	tv, err := p.matchTypeValue()
 	if err != nil {
@@ -83,19 +81,19 @@ func (p *Parser) matchTypeName() (ast.Type, error) {
 	if tv == nil {
 		return nil, p.errorf("bad type sytax in typedef '%s=...'", name)
 	}
-	return &ast.TypeDef{
+	return &zed.TypeDef{
 		Kind: "TypeDef",
 		Name: name,
 		Type: tv.Value,
 	}, nil
 }
 
-func (p *Parser) matchTypeRecord() (*ast.TypeRecord, error) {
+func (p *Parser) matchTypeRecord() (*zed.TypeRecord, error) {
 	l := p.lexer
 	if ok, err := l.match('{'); !ok || err != nil {
 		return nil, err
 	}
-	var fields []ast.TypeField
+	var fields []zed.TypeField
 	for {
 		field, err := p.matchTypeField()
 		if err != nil {
@@ -120,13 +118,13 @@ func (p *Parser) matchTypeRecord() (*ast.TypeRecord, error) {
 	if !ok {
 		return nil, p.error("mismatched braces while parsing record type")
 	}
-	return &ast.TypeRecord{
+	return &zed.TypeRecord{
 		Kind:   "TypeRecord",
 		Fields: fields,
 	}, nil
 }
 
-func (p *Parser) matchTypeField() (*ast.TypeField, error) {
+func (p *Parser) matchTypeField() (*zed.TypeField, error) {
 	l := p.lexer
 	symbol, ok, err := p.matchSymbol()
 	if err != nil {
@@ -146,13 +144,13 @@ func (p *Parser) matchTypeField() (*ast.TypeField, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ast.TypeField{
+	return &zed.TypeField{
 		Name: symbol,
 		Type: typ,
 	}, nil
 }
 
-func (p *Parser) matchTypeArray() (*ast.TypeArray, error) {
+func (p *Parser) matchTypeArray() (*zed.TypeArray, error) {
 	l := p.lexer
 	if ok, err := l.match('['); !ok || err != nil {
 		return nil, err
@@ -168,13 +166,13 @@ func (p *Parser) matchTypeArray() (*ast.TypeArray, error) {
 	if !ok {
 		return nil, p.error("mismatched brackets while parsing array type")
 	}
-	return &ast.TypeArray{
+	return &zed.TypeArray{
 		Kind: "TypeArray",
 		Type: typ,
 	}, nil
 }
 
-func (p *Parser) matchTypeSetOrMap() (ast.Type, error) {
+func (p *Parser) matchTypeSetOrMap() (zed.Type, error) {
 	l := p.lexer
 	if ok, err := l.match('|'); !ok || err != nil {
 		return nil, err
@@ -183,7 +181,7 @@ func (p *Parser) matchTypeSetOrMap() (ast.Type, error) {
 	if err != nil {
 		return nil, err
 	}
-	var typ ast.Type
+	var typ zed.Type
 	var which string
 	if isSet {
 		which = "set"
@@ -198,7 +196,7 @@ func (p *Parser) matchTypeSetOrMap() (ast.Type, error) {
 		if !ok {
 			return nil, p.error("mismatched set-brackets while parsing set type")
 		}
-		typ = &ast.TypeSet{
+		typ = &zed.TypeSet{
 			Kind: "TypeSet",
 			Type: inner,
 		}
@@ -234,7 +232,7 @@ func (p *Parser) matchTypeSetOrMap() (ast.Type, error) {
 
 }
 
-func (p *Parser) parseTypeMap() (*ast.TypeMap, error) {
+func (p *Parser) parseTypeMap() (*zed.TypeMap, error) {
 	keyType, err := p.parseType()
 	if err != nil {
 		return nil, err
@@ -250,19 +248,19 @@ func (p *Parser) parseTypeMap() (*ast.TypeMap, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ast.TypeMap{
+	return &zed.TypeMap{
 		Kind:    "TypeMap",
 		KeyType: keyType,
 		ValType: valType,
 	}, nil
 }
 
-func (p *Parser) matchTypeUnion() (*ast.TypeUnion, error) {
+func (p *Parser) matchTypeUnion() (*zed.TypeUnion, error) {
 	l := p.lexer
 	if ok, err := l.match('('); !ok || err != nil {
 		return nil, err
 	}
-	var types []ast.Type
+	var types []zed.Type
 	for {
 		typ, err := p.matchType()
 		if err != nil {
@@ -290,13 +288,13 @@ func (p *Parser) matchTypeUnion() (*ast.TypeUnion, error) {
 	if !ok {
 		return nil, p.error("mismatched parentheses while parsing union type")
 	}
-	return &ast.TypeUnion{
+	return &zed.TypeUnion{
 		Kind:  "TypeUnion",
 		Types: types,
 	}, nil
 }
 
-func (p *Parser) matchTypeEnum() (*ast.TypeEnum, error) {
+func (p *Parser) matchTypeEnum() (*zed.TypeEnum, error) {
 	l := p.lexer
 	if ok, err := l.match('<'); !ok || err != nil {
 		return nil, err
@@ -312,15 +310,15 @@ func (p *Parser) matchTypeEnum() (*ast.TypeEnum, error) {
 	if !ok {
 		return nil, p.error("mismatched brackets while parsing enum type")
 	}
-	return &ast.TypeEnum{
+	return &zed.TypeEnum{
 		Kind:     "TypeEnum",
 		Elements: fields,
 	}, nil
 }
 
-func (p *Parser) matchEnumFields() ([]ast.Field, error) {
+func (p *Parser) matchEnumFields() ([]zed.Field, error) {
 	l := p.lexer
-	var fields []ast.Field
+	var fields []zed.Field
 	for {
 		field, err := p.matchEnumField()
 		if err != nil {
@@ -341,7 +339,7 @@ func (p *Parser) matchEnumFields() ([]ast.Field, error) {
 	return fields, nil
 }
 
-func (p *Parser) matchEnumField() (*ast.Field, error) {
+func (p *Parser) matchEnumField() (*zed.Field, error) {
 	l := p.lexer
 	name, ok, err := p.matchSymbol()
 	if err != nil {
@@ -354,7 +352,7 @@ func (p *Parser) matchEnumField() (*ast.Field, error) {
 	if err != nil {
 		return nil, err
 	}
-	var val ast.Value
+	var val zed.Value
 	if ok {
 		v, err := p.ParseValue()
 		if err != nil {
@@ -362,7 +360,7 @@ func (p *Parser) matchEnumField() (*ast.Field, error) {
 		}
 		val = v
 	}
-	return &ast.Field{
+	return &zed.Field{
 		Name:  name,
 		Value: val,
 	}, nil

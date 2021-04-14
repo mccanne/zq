@@ -9,7 +9,7 @@ package zson
 import (
 	"strings"
 
-	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/zed"
 	"github.com/brimdata/zed/zng"
 )
 
@@ -68,6 +68,6 @@ func ParseType(zctx *Context, zson string) (zng.Type, error) {
 	return NewAnalyzer().convertType(zctx, ast)
 }
 
-func TranslateType(zctx *Context, astType ast.Type) (zng.Type, error) {
+func TranslateType(zctx *Context, astType zed.Type) (zng.Type, error) {
 	return NewAnalyzer().convertType(zctx, astType)
 }

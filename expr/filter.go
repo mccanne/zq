@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/brimdata/zed/compiler/ast"
+	"github.com/brimdata/zed/compiler/ast/zed"
 	"github.com/brimdata/zed/pkg/byteconv"
 	"github.com/brimdata/zed/pkg/stringsearch"
 	"github.com/brimdata/zed/zcode"
@@ -104,7 +104,7 @@ var errMatch = errors.New("match")
 // field or inside any set or array.  It also matches a record if the string
 // representaton of the search value appears inside inside any string-valued
 // field (or inside any element of a set or array of strings).
-func SearchRecordOther(searchtext string, searchval ast.Primitive) (Filter, error) {
+func SearchRecordOther(searchtext string, searchval zed.Primitive) (Filter, error) {
 	typedCompare, err := Comparison("=", searchval)
 	if err != nil {
 		return nil, err
