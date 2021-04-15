@@ -51,6 +51,14 @@ type TaskEnd struct {
 	Error  *Error `json:"error,omitempty"`
 }
 
+type RunRequest struct {
+	DAG json.RawMessage `json:"dag"`
+}
+
+type Searchv2Request struct {
+	Zed string `json:"zed"`
+}
+
 type SearchRequest struct {
 	Space SpaceID         `json:"space" validate:"required"`
 	Proc  json.RawMessage `json:"proc,omitempty"`
