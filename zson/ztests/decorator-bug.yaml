@@ -1,0 +1,6 @@
+zed: "*"
+
+input: &input |
+  {a:1 (foo=(int8)) (bar=((foo,int64)))}
+
+output: *input

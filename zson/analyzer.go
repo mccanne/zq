@@ -6,6 +6,7 @@ import (
 
 	"github.com/brimdata/zed/compiler/ast/zed"
 	"github.com/brimdata/zed/zng"
+	"github.com/kr/pretty"
 )
 
 type Value interface {
@@ -94,10 +95,12 @@ func NewAnalyzer() Analyzer {
 }
 
 func (a Analyzer) ConvertValue(zctx *Context, val zed.Value) (Value, error) {
+	pretty.Println("VAL", val)
 	return a.convertValue(zctx, val, nil)
 }
 
 func (a Analyzer) convertValue(zctx *Context, val zed.Value, parent zng.Type) (Value, error) {
+	fmt.Println("convertValue parent=", parent)
 	switch val := val.(type) {
 	case *zed.ImpliedValue:
 		return a.convertAny(zctx, val.Of, parent)
@@ -542,6 +545,7 @@ func (a Analyzer) convertTypeValue(zctx *Context, tv *zed.TypeValue, cast zng.Ty
 }
 
 func (a Analyzer) convertType(zctx *Context, typ zed.Type) (zng.Type, error) {
+	fmt.Printf("CONVERT TYPE: %T\n", typ)
 	switch t := typ.(type) {
 	case *zed.TypePrimitive:
 		name := t.Name
@@ -551,10 +555,12 @@ func (a Analyzer) convertType(zctx *Context, typ zed.Type) (zng.Type, error) {
 		}
 		return typ, nil
 	case *zed.TypeDef:
+		fmt.Println("CONVERT TYPE TYPEDEF", t.Name)
 		typ, err := a.convertType(zctx, t.Type)
 		if err != nil {
 			return nil, err
 		}
+		fmt.Println("CONVERT TYPE TYPEDEF", t.Name, typ.ZSON())
 		alias, err := a.enterTypeDef(zctx, t.Name, typ)
 		if err != nil {
 			return nil, err
