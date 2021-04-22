@@ -1,3 +1,5 @@
+# bug 2050
+
 zed: "*"
 
 input: &input |
