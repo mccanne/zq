@@ -21,7 +21,7 @@ func TestZed(t *testing.T) {
 	require.NoError(t, err)
 	for d := range dirs {
 		d := d
-		t.Run(d, func(t *testing.T) {
+		t.Run(filepath.ToSlash(d), func(t *testing.T) {
 			t.Parallel()
 			ztest.Run(t, d)
 		})

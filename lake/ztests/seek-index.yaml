@@ -4,7 +4,7 @@ script: |
   zed lake create -p asc -orderby ts:asc -q
   zed lake load -q -seekstride=2KB -p asc babble.zson
   zed lake query -z -s "from asc over 2020-04-21T23:59:26.063Z to 2020-04-21T23:59:38.069Z"
-  echo === | tee /dev/stderr
+  echo ===; echo === >&2
   zed lake create -p desc -orderby ts:desc -q
   zed lake load -q -seekstride=2KB -p desc babble.zson
   zed lake query -z -s "from desc over 2020-04-21T23:59:26.063Z to 2020-04-21T23:59:38.069Z"

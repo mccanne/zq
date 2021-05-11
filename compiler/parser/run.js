@@ -21,7 +21,7 @@ function parse_query(line) {
     }
 }
 
-let filename = '/dev/stdin';
+let filename = process.stdin.fd
 let argv = process.argv.slice(2);
 
 while (argv.length > 0) {

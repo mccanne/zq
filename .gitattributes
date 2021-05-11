@@ -1,0 +1,4 @@
+# For consistent behavior across different environments, treat all files
+# as binary so Git does no end-of-line conversion.
+
+* -text

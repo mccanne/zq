@@ -6,9 +6,16 @@ on:
     branches:
       - main
 
+defaults:
+ run:
+   shell: bash
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
     steps:
       - uses: actions/setup-go@v2
         with:
@@ -16,6 +23,9 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
+      # Use MSYS2's bash.exe in subsequent steps.
+      - if: startsWith(matrix.os, 'windows-')
+        run: echo 'C:\msys64\usr\bin' >> $GITHUB_PATH
       - run: go mod download
       - run: make fmt
       - run: make tidy
@@ -24,17 +34,6 @@ jobs:
       - run: make test-unit
       - run: make test-system
       - run: make test-heavy
-  test-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/setup-go@v2
-        with:
-          go-version: '1.16'
-      - uses: actions/checkout@v2
-      - run: go test -short ./...
-      - run: mkdir dist -ea 0
-      - run: go build -o dist ./cmd/...
-      - run: go test -v ./mdtest
   output-check:
     runs-on: ubuntu-latest
     steps:
