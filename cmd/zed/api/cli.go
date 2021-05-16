@@ -15,9 +15,6 @@ import (
 	"github.com/brimdata/zed/pkg/storage"
 	"github.com/brimdata/zed/pkg/terminal"
 	"github.com/brimdata/zed/zio"
-	"github.com/brimdata/zed/zng"
-	"github.com/brimdata/zed/zng/resolver"
-	"github.com/brimdata/zed/zson"
 	"github.com/segmentio/ksuid"
 )
 
@@ -127,31 +124,4 @@ func WriteOutput(ctx context.Context, flags outputflags.Flags, r zio.Reader) err
 		err = closeErr
 	}
 	return err
-}
-
-type nameReader struct {
-	idx   int
-	names []string
-	mc    *zson.MarshalZNGContext
-}
-
-func NewNameReader(names []string) zio.Reader {
-	return &nameReader{
-		names: names,
-		mc:    resolver.NewMarshaler(),
-	}
-}
-
-func (r *nameReader) Read() (*zng.Record, error) {
-	if r.idx >= len(r.names) {
-		return nil, nil
-	}
-	rec, err := r.mc.MarshalRecord(struct {
-		Name string `zng:"name"`
-	}{r.names[r.idx]})
-	if err != nil {
-		return nil, err
-	}
-	r.idx++
-	return rec, nil
 }

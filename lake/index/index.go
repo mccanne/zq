@@ -1,15 +1,12 @@
 package index
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/brimdata/zed/compiler"
 	"github.com/brimdata/zed/field"
 	"github.com/brimdata/zed/zio/tzngio"
-	"github.com/brimdata/zed/zio/zngio"
 	"github.com/brimdata/zed/zng"
-	"github.com/brimdata/zed/zng/resolver"
 	"github.com/brimdata/zed/zson"
 	"github.com/segmentio/ksuid"
 )
@@ -59,17 +56,6 @@ func NewFieldIndex(fieldName string) Index {
 		Kind:  IndexField,
 		Value: fieldName,
 	}
-}
-
-func UnmarshalIndex(b []byte) (Index, error) {
-	zctx := zson.NewContext()
-	zr := zngio.NewReader(bytes.NewReader(b), zctx)
-	rec, err := zr.Read()
-	if err != nil {
-		return Index{}, err
-	}
-	r := Index{}
-	return r, resolver.UnmarshalRecord(rec, &r)
 }
 
 func NewZedIndex(prog, name string, keys field.List) (Index, error) {

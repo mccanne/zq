@@ -40,7 +40,7 @@ func boomerang(t *testing.T, in interface{}, out interface{}) {
 	require.NoError(t, err)
 }
 
-func TestMarshal(t *testing.T) {
+func TestMarshalZNG(t *testing.T) {
 	type S2 struct {
 		Field2 string `zng:"f2"`
 		Field3 int
