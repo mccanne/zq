@@ -1,4 +1,4 @@
-package resolver_test
+package zson_test
 
 import (
 	"bytes"
