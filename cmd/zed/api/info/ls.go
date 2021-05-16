@@ -8,7 +8,6 @@ import (
 	apicmd "github.com/brimdata/zed/cmd/zed/api"
 	"github.com/brimdata/zed/pkg/charm"
 	"github.com/brimdata/zed/zng"
-	"github.com/brimdata/zed/zng/resolver"
 	"github.com/brimdata/zed/zson"
 )
 
@@ -73,7 +72,6 @@ type poolReader struct {
 func newPoolReader(pools []api.Pool) *poolReader {
 	return &poolReader{
 		pools: pools,
-		mc:    resolver.NewMarshaler(),
 	}
 }
 
