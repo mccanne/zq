@@ -401,7 +401,7 @@ func TestInterfaceUnmarshal(t *testing.T) {
 	var thingI interface{}
 	err = u.Unmarshal(zv, &thingI)
 	require.NoError(t, err)
-	actualThing, ok := thingI.(*Thing)
+	actualThing, ok := thingI.(*ZNGThing)
 	assert.Equal(t, true, ok)
 	assert.Equal(t, t1, actualThing)
 
