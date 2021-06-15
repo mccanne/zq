@@ -92,6 +92,14 @@ const (
 	IDNull     = 22
 
 	IDTypeDef = 23
+
+	IDTypeName = 24
+	IDRecord   = 25
+	IDArray    = 26
+	IDSet      = 27
+	IDUnion    = 28
+	IDEnum     = 29
+	IDMap      = 30
 )
 
 var promote = []int{
@@ -268,7 +276,7 @@ func LookupPrimitiveByID(id int) Type {
 // creates each unique type only once, this pointer comparison works.  If types
 // are created outside of the zeek package, then SameType will not work in general
 // for them.
-func SameType(t1, t2 Type) bool {
+func xSameType(t1, t2 Type) bool {
 	return t1 == t2
 }
 
@@ -335,6 +343,7 @@ func IsPrimitiveType(typ Type) bool {
 	return !IsContainerType(typ)
 }
 
+//XXX get rid of this?
 func AliasTypes(typ Type) []*TypeAlias {
 	var aliases []*TypeAlias
 	switch typ := typ.(type) {

@@ -20,6 +20,7 @@ func (t *TypeOfType) Marshal(zv zcode.Bytes) (interface{}, error) {
 	return t.Format(zv), nil
 }
 
+//XXX wrong call FormatType
 func (t *TypeOfType) Format(zv zcode.Bytes) string {
-	return fmt.Sprintf("(%s)", string(zv))
+	return fmt.Sprintf("(%s)", FormatType(zv))
 }
