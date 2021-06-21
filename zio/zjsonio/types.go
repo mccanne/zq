@@ -126,8 +126,8 @@ func (d decoder) decodeType(zctx *zson.Context, typ zed.Type) (zng.Type, error) 
 		}
 		return zctx.LookupTypeAlias(typ.Name, t)
 	case *zed.TypePrimitive:
-		t, err := zctx.LookupByName(typ.Name)
-		if err != nil {
+		t := zng.LookupPrimitive(typ.Name)
+		if t == nil {
 			return nil, errors.New("ZJSON unknown type: " + typ.Name)
 		}
 		return t, nil

@@ -196,7 +196,7 @@ func (c *Context) LookupTypeAlias(name string, target Type) (*TypeAlias, error) 
 // record along with new rightmost columns as indicated with the given values.
 // If any of the newly provided columns already exists in the specified value,
 // an error is returned.
-func (c *Context) xAddColumns(r *Record, newCols []Column, vals []Value) (*Record, error) {
+func (c *Context) AddColumns(r *Record, newCols []Column, vals []Value) (*Record, error) {
 	oldCols := TypeRecordOf(r.Type).Columns
 	outCols := make([]Column, len(oldCols), len(oldCols)+len(newCols))
 	copy(outCols, oldCols)
@@ -218,12 +218,9 @@ func (c *Context) xAddColumns(r *Record, newCols []Column, vals []Value) (*Recor
 	return NewRecord(typ, zv), nil
 }
 
-//XXX update comment
-// LookupByName returns the Type indicated by the ZSON type string.  The type string
-// may be a simple type like int, double, time, etc or it may be a set
-// or an array, which are recusively composed of other types.  Nested sub-types
-// of complex types are each created once and interned so that pointer comparison
-// can be used to determine type equality.
+// LookupByValue returns the Type indicated by a binary-serialized type value.
+// This provides a means to translate a type-context-independent serialized
+// encoding for an arbitrary type into the reciever Context.
 func (c *Context) LookupByValue(tv zcode.Bytes) (Type, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -231,18 +228,15 @@ func (c *Context) LookupByValue(tv zcode.Bytes) (Type, error) {
 	if ok {
 		return typ, nil
 	}
-	typ, err := c.decodeValue(tv, nil)
+	c.mu.Unlock()
+	typ, err := c.decodeTypeValue(tv)
+	c.mu.Lock()
 	if err != nil {
 		return nil, err
 	}
 	c.toValue[typ] = tv
 	c.toType[string(tv)] = typ
 	return typ, nil
-}
-
-func (c *Context) decodeValue(b zcode.Bytes, typedefs map[Type]struct{}) (Type, error) {
-	//XXX
-	return nil, nil
 }
 
 // TranslateType takes a type from another context and creates and returns that
@@ -287,7 +281,138 @@ func (c *Context) LookupTypeValue(typ Type) Value {
 	return c.LookupTypeValue(typ)
 }
 
-//XXX get rid of this method
-func (c *Context) FromTypeEncoding(bytes zcode.Bytes) (Type, error) {
-	return c.LookupByValue(bytes)
+func (c *Context) decodeTypeValue(tv zcode.Bytes) (Type, zcode.Bytes) {
+	if len(tv) == 0 {
+		return nil, nil
+	}
+	id := tv[0]
+	tv = tv[1:]
+	switch id {
+	case IDTypeDef:
+		name, tv := decodeName(tv)
+		if tv == nil {
+			return nil, nil
+		}
+		var typ Type
+		typ, tv = c.decodeTypeValue(tv)
+		if tv == nil {
+			return nil, nil
+		}
+		alias, err := c.LookupTypeAlias(name, typ)
+		if err != nil {
+			return nil, nil
+		}
+		return alias, tv
+	case IDTypeName:
+		name, tv := decodeName(tv)
+		if tv == nil {
+			return nil, nil
+		}
+		typ := c.LookupTypeDef(name)
+		if typ == nil {
+			return nil, nil
+		}
+		return typ, tv
+	case IDRecord:
+		n, tv := decodeInt(tv)
+		if tv == nil {
+			return nil, nil
+		}
+		//XXX limit check max cols
+		cols := make([]Column, 0, n)
+		for k := 0; k < n; k++ {
+			var name string
+			name, tv = decodeName(tv)
+			if tv == nil {
+				return nil, nil
+			}
+			var typ Type
+			typ, tv = c.decodeTypeValue(tv)
+			if tv == nil {
+				return nil, nil
+			}
+			cols = append(cols, Column{name,typ})
+		}
+		typ, err := c.LookupTypeRecord(cols)
+		if err != nil {
+			return nil, nil
+		}
+		return typ, tv
+	case IDArray:
+		inner, tv := c.decodeTypeValue(tv)
+		if tv == nil {
+			return nil, nil
+		}
+		typ := c.LookupTypeArray(inner)
+		if typ == nil {
+			return nil, nil
+		}
+		return typ, tv
+	case IDSet:
+		inner, tv := c.decodeTypeValue(tv)
+		if tv == nil {
+			return nil, nil
+		}
+		typ := c.LookupTypeSet(inner)
+		if typ == nil {
+			return nil, nil
+		}
+		return typ, tv
+	case IDMap:
+		keyType, tv := c.decodeTypeValue(tv)
+		if tv == nil {
+			return nil, nil
+		}
+		valType, tv := c.decodeTypeValue(tv)
+		if tv == nil {
+			return nil, nil
+		}
+		typ := c.LookupTypeMap(keyType, valType)
+		if typ == nil {
+			return nil, nil
+		}
+		return typ, tv
+	case IDUnion:
+		n, tv := decodeInt(tv)
+		if tv == nil {
+			return nil, nil
+		}
+		//XXX limit check n
+		types := make([]Type, 0, n)
+		for k := 0; k < n; k++ {
+			var typ Type
+			typ, tv = c.decodeTypeValue(tv)
+			types = append(types, typ)
+		}
+		typ := c.LookupTypeUnion(types)
+		if typ == nil {
+			return nil, nil
+		}
+		return typ, tv
+	case IDEnum:
+		//XXX this is not quite compatible with the current enum format,
+		// but we're going to simplify it so, here...
+		n, tv := decodeInt(tv)
+		if tv == nil {
+			return nil, nil
+		}
+		//XXX limit check n
+		for k := 0; k < n; k++ {
+			var symbol string
+			symbol, tv = decodeName(tv)
+			if tv == nil {
+				return nil, nil
+			}
+			b.WriteString(QuotedName(symbol))
+		}
+		b.WriteByte('>')
+	default:
+		if id < 0 || id > IDTypeDef {
+			b.WriteString(fmt.Sprintf("<ERR bad type ID %d in type value>", id))
+			return nil
+		}
+		typ := LookupPrimitiveByID(int(id))
+		b.WriteString(typ.String())
+	}
+	return tv
 }

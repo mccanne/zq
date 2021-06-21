@@ -31,7 +31,7 @@ type Index struct {
 
 func ParseIndex(pattern string) (Index, error) {
 	if pattern[0] == ':' {
-		typ, err := zson.NewContext().LookupByName(pattern[1:])
+		typ, err := zson.ParseType(zson.NewContext(), pattern[1:])
 		if err != nil {
 			return Index{}, err
 		}

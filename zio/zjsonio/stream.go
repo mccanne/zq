@@ -127,7 +127,7 @@ func (s *Stream) appendTypeValues(types []zed.Type, zv zng.Value) []zed.Type {
 			return zng.SkipContainer
 		}
 		if typ == zng.TypeType {
-			typ, err := s.zctx.FromTypeBytes(bytes)
+			typ, err := s.zctx.LookupByValue(bytes)
 			if err != nil {
 				// this shouldn't happen
 				return nil

@@ -45,11 +45,7 @@ func isRecordType(zv zng.Value, zctx *zson.Context) *zng.TypeRecord {
 		return typ
 	}
 	if zv.Type == zng.TypeType {
-		s, err := zng.DecodeString(zv.Bytes)
-		if err != nil {
-			return nil
-		}
-		typ, err := zctx.LookupByName(s)
+		typ, err := zctx.LookupByValue(zv.Bytes)
 		if err != nil {
 			return nil
 		}

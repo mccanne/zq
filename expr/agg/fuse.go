@@ -40,7 +40,7 @@ func (f *fuse) Result(zctx *zson.Context) (zng.Value, error) {
 	schema.unify = true
 
 	for _, p := range f.partials {
-		typ, err := zctx.LookupByName(string(p.Bytes))
+		typ, err := zctx.LookupByValue(p.Bytes)
 		if err != nil {
 			return zng.Value{}, fmt.Errorf("invalid partial value: %w", err)
 		}

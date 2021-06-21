@@ -10,7 +10,7 @@ import (
 
 func TestFieldNameIter(t *testing.T) {
 	const typeString = "{r1:{r2:{s:string,r3:{t:time}},a:[int64],r4:{i:ip}},empty:{}}"
-	typ, err := zson.NewContext().LookupByName(typeString)
+	typ, err := zson.ParseType(zson.NewContext(), typeString)
 	require.NoError(t, err)
 	var f FieldNameIter
 	f.Init(typ.(*zng.TypeRecord))
@@ -26,8 +26,9 @@ func TestFieldNameIter(t *testing.T) {
 	require.Exactly(t, "empty", string(f.Next()))
 	require.True(t, f.Done())
 }
+
 func TestFieldNameIterEmptyTopLevelRecord(t *testing.T) {
-	typ, err := zson.NewContext().LookupByName("{}")
+	typ, err := zson.ParseType(zson.NewContext(), "{}")
 	require.NoError(t, err)
 	var f FieldNameIter
 	f.Init(typ.(*zng.TypeRecord))

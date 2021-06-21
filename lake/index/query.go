@@ -43,11 +43,11 @@ func ParseQuery(name string, patterns []string) (Query, error) {
 	q := Query{Values: []string{v[1]}}
 	path := v[0]
 	if path[0] == ':' {
-		typ, err := zson.NewContext().LookupByName(path[1:])
+		typ, err := zson.ParseType(zson.NewContext(), path[1:])
 		if err != nil {
 			return Query{}, err
 		}
-		//XXX should use zson
+		//XXX this should be a serialized type value and tzngio should go
 		q.Type = tzngio.TypeString(typ)
 	} else {
 		q.Field = path

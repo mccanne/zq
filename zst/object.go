@@ -143,7 +143,7 @@ func (o *Object) readAssembly() (*Assembly, error) {
 	if err != nil {
 		return nil, err
 	}
-	expectedType, err := o.zctx.LookupByName(column.SegmapTypeString)
+	expectedType, err := zson.ParseType(o.zctx, column.SegmapTypeString)
 	if err != nil {
 		return nil, err
 	}

@@ -66,7 +66,7 @@ func encodePrimitive(zctx *zson.Context, typ zng.Type, v zcode.Bytes) (interface
 		return fld, nil
 	}
 	if typ == zng.TypeType {
-		typ, err := zctx.FromTypeBytes(v)
+		typ, err := zctx.LookupByValue(v)
 		if err != nil {
 			return nil, err
 		}

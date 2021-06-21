@@ -277,7 +277,7 @@ func (s *Shaper) Eval(rec *zng.Record) (zng.Value, error) {
 	if typVal.Type != zng.TypeType {
 		return zng.NewErrorf("shaper function type argument is not a type"), nil
 	}
-	shapeTo, err := s.zctx.FromTypeBytes(typVal.Bytes)
+	shapeTo, err := s.zctx.LookupByValue(typVal.Bytes)
 	if err != nil {
 		return zng.NewErrorf("shaper encountered unknown type value: %s", err), nil
 	}

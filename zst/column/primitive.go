@@ -49,7 +49,7 @@ func (p *PrimitiveWriter) MarshalZNG(zctx *zson.Context, b *zcode.Builder) (zng.
 		b.EndContainer()
 	}
 	b.EndContainer()
-	return zctx.LookupByName(SegmapTypeString)
+	return zson.ParseType(zctx, SegmapTypeString)
 }
 
 type Primitive struct {

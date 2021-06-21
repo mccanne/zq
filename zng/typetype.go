@@ -114,7 +114,7 @@ func formatTypeValue(tv zcode.Bytes, b *strings.Builder) zcode.Bytes {
 	tv = tv[1:]
 	switch id {
 	case IDTypeDef:
-		name, tv := decodeName(tv, b)
+		name, tv := decodeNameWithCheck(tv, b)
 		if tv == nil {
 			return nil
 		}
@@ -124,7 +124,7 @@ func formatTypeValue(tv zcode.Bytes, b *strings.Builder) zcode.Bytes {
 		b.WriteByte(')')
 		return tv
 	case IDTypeName:
-		name, tv := decodeName(tv, b)
+		name, tv := decodeNameWithCheck(tv, b)
 		if tv == nil {
 			return nil
 		}
@@ -133,12 +133,16 @@ func formatTypeValue(tv zcode.Bytes, b *strings.Builder) zcode.Bytes {
 	case IDRecord:
 		b.WriteByte('{')
 		n, tv := decodeInt(tv, b)
+		if tv == nil {
+			truncErr(b)
+			return nil
+		}
 		for k := 0; k < n; k++ {
 			if k > 0 {
 				b.WriteByte(',')
 			}
 			var name string
-			name, tv = decodeName(tv, b)
+			name, tv = decodeNameWithCheck(tv, b)
 			b.WriteString(name)
 			b.WriteString(":")
 			tv = formatTypeValue(tv, b)
@@ -164,6 +168,10 @@ func formatTypeValue(tv zcode.Bytes, b *strings.Builder) zcode.Bytes {
 	case IDUnion:
 		b.WriteByte('(')
 		n, tv := decodeInt(tv, b)
+		if tv == nil {
+			truncErr(b)
+			return nil
+		}
 		for k := 0; k < n; k++ {
 			if k > 0 {
 				b.WriteByte(',')
@@ -176,12 +184,16 @@ func formatTypeValue(tv zcode.Bytes, b *strings.Builder) zcode.Bytes {
 		// but we're going to simplify it so, here...
 		b.WriteByte('<')
 		n, tv := decodeInt(tv, b)
+		if tv == nil {
+			truncErr(b)
+			return nil
+		}
 		for k := 0; k < n; k++ {
 			if k > 0 {
 				b.WriteByte(',')
 			}
 			var symbol string
-			symbol, tv = decodeName(tv, b)
+			symbol, tv = decodeNameWithCheck(tv, b)
 			if tv == nil {
 				return nil
 			}
@@ -199,26 +211,31 @@ func formatTypeValue(tv zcode.Bytes, b *strings.Builder) zcode.Bytes {
 	return tv
 }
 
-func decodeName(tv zcode.Bytes, b *strings.Builder) (string, zcode.Bytes) {
+func decodeNameAndCheck(tv zcode.Bytes, b *strings.Builder) (string, zcode.Bytes) {
+	name, tv = decodeName(tv)
+	if tv == nil {
+		truncErr(b)
+	}
+	return name, tv
+}
+
+func decodeName(tv zcode.Bytes) (string, zcode.Bytes) {
 	namelen, tv := decodeInt(tv, b)
 	if tv == nil {
 		return "", nil
 	}
 	if int(namelen) > len(tv) {
-		truncErr(b)
 		return "", nil
 	}
 	return string(tv[:namelen]), tv[namelen:]
 }
 
-func decodeInt(tv zcode.Bytes, b *strings.Builder) (int, zcode.Bytes) {
+func decodeInt(tv zcode.Bytes) (int, zcode.Bytes) {
 	if len(tv) < 0 {
-		truncErr(b)
 		return 0, nil
 	}
 	namelen, n := binary.Uvarint(tv)
 	if n <= 0 {
-		truncErr(b)
 		return 0, nil
 	}
 	return int(namelen), tv[n:]

@@ -209,11 +209,7 @@ func (i *is) Call(args []zng.Value) (zng.Value, error) {
 	if !zvTypeVal.IsStringy() {
 		return zng.False, nil
 	}
-	s, err := zng.DecodeString(zvTypeVal.Bytes)
-	if err != nil {
-		return zng.Value{}, err
-	}
-	typ, err := i.zctx.LookupByName(s)
+	typ, err := i.zctx.LookupByValue(zvTypeVal.Bytes)
 	if err == nil && typ == zvSubject.Type {
 		return zng.True, nil
 	}

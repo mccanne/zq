@@ -1,4 +1,4 @@
-package resolver_test
+package zng_test
 
 import (
 	"testing"
@@ -17,11 +17,11 @@ func TestDuplicates(t *testing.T) {
 		zng.NewColumn("b", setType),
 	})
 	require.NoError(t, err)
-	typ2, err := ctx.LookupByName("{a:string,b:|[int32]|}")
+	typ2, err := zson.ParseType(ctx, "{a:string,b:|[int32]|}")
 	require.NoError(t, err)
 	assert.EqualValues(t, typ1.ID(), typ2.ID())
 	assert.EqualValues(t, setType.ID(), typ2.(*zng.TypeRecord).Columns[1].Type.ID())
-	typ3, err := ctx.LookupByName("|[int32]|")
+	typ3, err := ctx.LookupByValue(zng.EncodeTypeValue(setType))
 	require.NoError(t, err)
 	assert.Equal(t, setType.ID(), typ3.ID())
 }
@@ -29,9 +29,9 @@ func TestDuplicates(t *testing.T) {
 func TestTranslateAlias(t *testing.T) {
 	c1 := zson.NewContext()
 	c2 := zson.NewContext()
-	set1, err := c1.LookupByName("|[int64]|")
+	set1, err := zson.ParseType(c1, "|[int64]|")
 	require.NoError(t, err)
-	set2, err := c2.LookupByName("|[int64]|")
+	set2, err := zson.ParseType(c2, "|[int64]|")
 	require.NoError(t, err)
 	alias1, err := c1.LookupTypeAlias("foo", set1)
 	require.NoError(t, err)
