@@ -400,3 +400,71 @@ func TypeID(typ Type) int {
 	}
 	return typ.ID()
 }
+
+func FormatType(typ Type) string {
+	var b strings.Builder
+	formatType(typ, &b, nil)
+	return b.String()
+}
+
+func formatType(typ Type, b *strings.Builder, typedefs map[string]Type) {
+	switch t := typ.(type) {
+	case *TypeAlias:
+		name := t.Name
+		b.WriteString(name)
+		if typedefs == nil {
+			typedefs = make(map[string]Type)
+		}
+		if previous, ok := typedefs[t.Name]; !ok || previous != t {
+			typedefs[t.Name] = t
+			b.WriteString("=(")
+			formatType(t.Type, b, typedefs)
+			b.WriteByte(')')
+		}
+	case *TypeRecord:
+		b.WriteByte('{')
+		for k, col := range t.Columns {
+			if k > 0 {
+				b.WriteByte(',')
+			}
+			b.WriteString(QuotedName(col.Name))
+			b.WriteString(":")
+			formatType(col.Type, b, typedefs)
+		}
+		b.WriteByte('}')
+	case *TypeArray:
+		b.WriteByte('[')
+		formatType(t.Type, b, typedefs)
+		b.WriteByte(']')
+	case *TypeSet:
+		b.WriteString("|[")
+		formatType(t.Type, b, typedefs)
+		b.WriteString("]|")
+	case *TypeMap:
+		b.WriteString("|{")
+		formatType(t.KeyType, b, typedefs)
+		b.WriteByte(',')
+		formatType(t.ValType, b, typedefs)
+		b.WriteString("}|")
+	case *TypeUnion:
+		b.WriteByte('(')
+		for k, typ := range t.Types {
+			if k > 0 {
+				b.WriteByte(',')
+			}
+			formatType(typ, b, typedefs)
+		}
+		b.WriteByte(')')
+	case *TypeEnum:
+		b.WriteByte('<')
+		for k, elem := range t.Elements {
+			if k > 0 {
+				b.WriteByte(',')
+			}
+			b.WriteString(QuotedName(elem.Name))
+		}
+		b.WriteByte('>')
+	default:
+		b.WriteString(typ.String())
+	}
+}
