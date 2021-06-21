@@ -92,7 +92,7 @@ func (c *Context) LookupTypeRecord(columns []Column) (*TypeRecord, error) {
 		}
 		names[col.Name] = struct{}{}
 	}
-	tv := EncodeType(&TypeRecord{Columns: columns})
+	tv := EncodeTypeValue(&TypeRecord{Columns: columns})
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if typ, ok := c.toType[string(tv)]; ok {
@@ -113,7 +113,7 @@ func (c *Context) MustLookupTypeRecord(columns []Column) *TypeRecord {
 }
 
 func (c *Context) LookupTypeSet(inner Type) *TypeSet {
-	tv := EncodeType(&TypeSet{Type: inner})
+	tv := EncodeTypeValue(&TypeSet{Type: inner})
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if typ, ok := c.toType[string(tv)]; ok {
@@ -125,7 +125,7 @@ func (c *Context) LookupTypeSet(inner Type) *TypeSet {
 }
 
 func (c *Context) LookupTypeMap(keyType, valType Type) *TypeMap {
-	tv := EncodeType(&TypeMap{KeyType: keyType, ValType: valType})
+	tv := EncodeTypeValue(&TypeMap{KeyType: keyType, ValType: valType})
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if typ, ok := c.toType[string(tv)]; ok {
@@ -137,7 +137,7 @@ func (c *Context) LookupTypeMap(keyType, valType Type) *TypeMap {
 }
 
 func (c *Context) LookupTypeArray(inner Type) *TypeArray {
-	tv := EncodeType(&TypeArray{Type: inner})
+	tv := EncodeTypeValue(&TypeArray{Type: inner})
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if typ, ok := c.toType[string(tv)]; ok {
@@ -149,7 +149,7 @@ func (c *Context) LookupTypeArray(inner Type) *TypeArray {
 }
 
 func (c *Context) LookupTypeUnion(types []Type) *TypeUnion {
-	tv := EncodeType(&TypeUnion{Types: types})
+	tv := EncodeTypeValue(&TypeUnion{Types: types})
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if typ, ok := c.toType[string(tv)]; ok {
@@ -161,7 +161,7 @@ func (c *Context) LookupTypeUnion(types []Type) *TypeUnion {
 }
 
 func (c *Context) LookupTypeEnum(elemType Type, elements []Element) *TypeEnum {
-	tv := EncodeType(&TypeEnum{Type: elemType, Elements: elements})
+	tv := EncodeTypeValue(&TypeEnum{Type: elemType, Elements: elements})
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if typ, ok := c.toType[string(tv)]; ok {
@@ -188,7 +188,7 @@ func (c *Context) LookupTypeAlias(name string, target Type) (*TypeAlias, error) 
 	}
 	typ := NewTypeAlias(c.nextIDWithLock(), name, target)
 	c.typedefs[name] = typ
-	c.enterWithLock(EncodeType(typ), typ)
+	c.enterWithLock(EncodeTypeValue(typ), typ)
 	return typ, nil
 }
 
@@ -248,7 +248,7 @@ func (c *Context) decodeValue(b zcode.Bytes, typedefs map[Type]struct{}) (Type, 
 // TranslateType takes a type from another context and creates and returns that
 // type in this context.
 func (c *Context) TranslateType(ext Type) (Type, error) {
-	return c.LookupByValue(EncodeType(ext))
+	return c.LookupByValue(EncodeTypeValue(ext))
 }
 
 func (t *Context) TranslateTypeRecord(ext *TypeRecord) (*TypeRecord, error) {
@@ -279,7 +279,7 @@ func (c *Context) LookupTypeValue(typ Type) Value {
 	// type that wasn't initially created in this context.
 	// In this case, we round-trip through the context-independent
 	// type value to populate this context with the needed type state.
-	typ, err := c.LookupByValue(EncodeType(typ))
+	typ, err := c.LookupByValue(EncodeTypeValue(typ))
 	if err != nil {
 		// This shouldn't happen...
 		return Missing

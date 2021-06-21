@@ -1,6 +1,8 @@
 package zng
 
 import (
+	"encoding/binary"
+	"fmt"
 	"strings"
 
 	"github.com/brimdata/zed/zcode"
@@ -74,7 +76,7 @@ func formatType(typ Type, b *strings.Builder, typedefs map[string]Type) {
 	}
 }
 
-func EncodeType(t Type) zcode.Bytes {
+func EncodeTypeValue(t Type) zcode.Bytes {
 	return appendTypeValue(nil, t, nil)
 }
 
@@ -124,12 +126,13 @@ func appendTypeValue(b zcode.Bytes, t Type, typedefs map[string]Type) zcode.Byte
 		b = append(b, IDEnum)
 		b = appendTypeValue(b, t.Type, typedefs)
 		b = zcode.AppendUvarint(b, uint64(len(t.Elements)))
-		container := IsContainerType(t.Type)
+		//container := IsContainerType(t.Type)
 		for _, elem := range t.Elements {
 			name := []byte(elem.Name)
 			b = zcode.AppendUvarint(b, uint64(len(name)))
 			b = append(b, name...)
-			b = zcode.AppendAs(b, container, elem.Value)
+			//XXX conform with format in issue #XXX.
+			//b = zcode.AppendAs(b, container, elem.Value)
 		}
 		return b
 	case *TypeMap:
@@ -140,4 +143,133 @@ func appendTypeValue(b zcode.Bytes, t Type, typedefs map[string]Type) zcode.Byte
 		// Primitive type
 		return append(b, byte(t.ID()))
 	}
+}
+
+func FormatTypeValue(tv zcode.Bytes) string {
+	var b strings.Builder
+	formatTypeValue(tv, &b)
+	return b.String()
+}
+
+func truncErr(b *strings.Builder) {
+	b.WriteString("<ERR truncated type value>")
+}
+
+func formatTypeValue(tv zcode.Bytes, b *strings.Builder) zcode.Bytes {
+	if len(tv) == 0 {
+		truncErr(b)
+		return nil
+	}
+	id := tv[0]
+	tv = tv[1:]
+	switch id {
+	case IDTypeDef:
+		name, tv := decodeName(tv, b)
+		if tv == nil {
+			return nil
+		}
+		b.WriteString(name)
+		b.WriteString("=(")
+		tv = formatTypeValue(tv, b)
+		b.WriteByte(')')
+		return tv
+	case IDTypeName:
+		name, tv := decodeName(tv, b)
+		if tv == nil {
+			return nil
+		}
+		b.WriteString(name)
+		return tv
+	case IDRecord:
+		b.WriteByte('{')
+		n, tv := decodeInt(tv, b)
+		for k := 0; k < n; k++ {
+			if k > 0 {
+				b.WriteByte(',')
+			}
+			var name string
+			name, tv = decodeName(tv, b)
+			b.WriteString(name)
+			b.WriteString(":")
+			tv = formatTypeValue(tv, b)
+			if tv == nil {
+				return nil
+			}
+		}
+		b.WriteByte('}')
+	case IDArray:
+		b.WriteByte('[')
+		tv = formatTypeValue(tv, b)
+		b.WriteByte(']')
+	case IDSet:
+		b.WriteString("|[")
+		tv = formatTypeValue(tv, b)
+		b.WriteString("]|")
+	case IDMap:
+		b.WriteString("|{")
+		tv = formatTypeValue(tv, b)
+		b.WriteByte(',')
+		tv = formatTypeValue(tv, b)
+		b.WriteString("}|")
+	case IDUnion:
+		b.WriteByte('(')
+		n, tv := decodeInt(tv, b)
+		for k := 0; k < n; k++ {
+			if k > 0 {
+				b.WriteByte(',')
+			}
+			tv = formatTypeValue(tv, b)
+		}
+		b.WriteByte(')')
+	case IDEnum:
+		//XXX this is not quite compatible with the current enum format,
+		// but we're going to simplify it so, here...
+		b.WriteByte('<')
+		n, tv := decodeInt(tv, b)
+		for k := 0; k < n; k++ {
+			if k > 0 {
+				b.WriteByte(',')
+			}
+			var symbol string
+			symbol, tv = decodeName(tv, b)
+			if tv == nil {
+				return nil
+			}
+			b.WriteString(QuotedName(symbol))
+		}
+		b.WriteByte('>')
+	default:
+		if id < 0 || id > IDTypeDef {
+			b.WriteString(fmt.Sprintf("<ERR bad type ID %d in type value>", id))
+			return nil
+		}
+		typ := LookupPrimitiveByID(int(id))
+		b.WriteString(typ.String())
+	}
+	return tv
+}
+
+func decodeName(tv zcode.Bytes, b *strings.Builder) (string, zcode.Bytes) {
+	namelen, tv := decodeInt(tv, b)
+	if tv == nil {
+		return "", nil
+	}
+	if int(namelen) > len(tv) {
+		truncErr(b)
+		return "", nil
+	}
+	return string(tv[:namelen]), tv[namelen:]
+}
+
+func decodeInt(tv zcode.Bytes, b *strings.Builder) (int, zcode.Bytes) {
+	if len(tv) < 0 {
+		truncErr(b)
+		return 0, nil
+	}
+	namelen, n := binary.Uvarint(tv)
+	if n <= 0 {
+		truncErr(b)
+		return 0, nil
+	}
+	return int(namelen), tv[n:]
 }
