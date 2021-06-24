@@ -75,8 +75,7 @@ how it's output as ZSON by `zq`, and then how it's written back out again as a Z
 log. You may find it helpful to refer to this example when reading the
 [Type-Specific Details](#type-specific-details) sections.
 
-```
-$ cat zeek_types.log
+```mdtest-input zeek_types.log
 #separator \x09
 #set_separator	,
 #empty_field	(empty)
@@ -86,8 +85,11 @@ $ cat zeek_types.log
 T	123	456	123.4560	1592502151.123456	123.456	smile\xf0\x9f\x98\x81smile	\x09\x07\x04	80	127.0.0.1	10.0.0.0/8	tcp	things,in,a,set	order,is,important	Jeanne	122
 ```
 
+```mdtest-command
+zq -Z zeek_types.log | tee zeek_types.zson
 ```
-$ zq -Z zeek_types.log | tee zeek_types.zson
+
+```mdtest-output
 {
     my_bool: true,
     my_count: 123 (uint64),
@@ -119,8 +121,11 @@ $ zq -Z zeek_types.log | tee zeek_types.zson
 } (=3)
 ```
 
-``` 
-$ zq -f zeek zeek_types.zson
+```mdtest-command
+zq -f zeek zeek_types.zson
+```
+
+```mdtest-output
 #separator \x09
 #set_separator	,
 #empty_field	(empty)
@@ -234,8 +239,11 @@ down in the record hierarchy.
 Revisiting the data from our example, we can output all fields within
 `my_record` via this Zed operation:
 
+```mdtest-command
+zq -f zeek 'cut my_record' zeek_types.zson
 ```
-$ zq -f zeek 'cut my_record' zeek_types.zson
+
+```mdtest-output
 #separator \x09
 #set_separator	,
 #empty_field	(empty)
