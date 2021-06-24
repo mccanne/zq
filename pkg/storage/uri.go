@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/brimdata/zed/zng"
+	"github.com/brimdata/zed"
 	"github.com/brimdata/zed/zson"
 )
 
@@ -79,6 +79,6 @@ func (u *URI) UnmarshalText(b []byte) error {
 	return nil
 }
 
-func (u *URI) MarshalZNG(mc *zson.MarshalZNGContext) (zng.Type, error) {
+func (u *URI) MarshalZNG(mc *zson.MarshalZNGContext) (zed.Type, error) {
 	return mc.MarshalValue(u.String())
 }
