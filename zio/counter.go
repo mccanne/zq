@@ -3,7 +3,7 @@ package zio
 import (
 	"sync/atomic"
 
-	"github.com/brimdata/zed/zng"
+	"github.com/brimdata/zed"
 )
 
 // Counter wraps a zbuf.Reader and provides a method to return the number
@@ -21,7 +21,7 @@ func NewCounter(reader Reader, p *int64) *Counter {
 	return &Counter{Reader: reader, counter: p}
 }
 
-func (c *Counter) Read() (*zng.Record, error) {
+func (c *Counter) Read() (*zed.Record, error) {
 	rec, err := c.Reader.Read()
 	if rec != nil {
 		atomic.AddInt64(c.counter, 1)

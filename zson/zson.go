@@ -3,35 +3,35 @@
 // that requries a semantic analysis to parse an input to its structured data
 // representation.  To do so, Parser translats a ZSON input to an AST, Analyzer
 // performs semantic type analysis to turn the AST into a Value, and Builder
-// constructs a zng.Value from a Value.
+// constructs a zed.Value from a Value.
 package zson
 
 import (
 	"strings"
 
+	"github.com/brimdata/zed"
 	"github.com/brimdata/zed/compiler/ast/zed"
 	"github.com/brimdata/zed/zcode"
-	"github.com/brimdata/zed/zng"
 )
 
 // Implied returns true for primitive types whose type can be inferred
 // syntactically from its value and thus never needs a decorator.
-func Implied(typ zng.Type) bool {
+func Implied(typ zed.Type) bool {
 	switch typ := typ.(type) {
-	case *zng.TypeOfInt64, *zng.TypeOfDuration, *zng.TypeOfTime, *zng.TypeOfFloat64, *zng.TypeOfBool, *zng.TypeOfBytes, *zng.TypeOfString, *zng.TypeOfIP, *zng.TypeOfNet, *zng.TypeOfType, *zng.TypeOfNull:
+	case *zed.TypeOfInt64, *zed.TypeOfDuration, *zed.TypeOfTime, *zed.TypeOfFloat64, *zed.TypeOfBool, *zed.TypeOfBytes, *zed.TypeOfString, *zed.TypeOfIP, *zed.TypeOfNet, *zed.TypeOfType, *zed.TypeOfNull:
 		return true
-	case *zng.TypeRecord:
+	case *zed.TypeRecord:
 		for _, c := range typ.Columns {
 			if !Implied(c.Type) {
 				return false
 			}
 		}
 		return true
-	case *zng.TypeArray:
+	case *zed.TypeArray:
 		return Implied(typ.Type)
-	case *zng.TypeSet:
+	case *zed.TypeSet:
 		return Implied(typ.Type)
-	case *zng.TypeMap:
+	case *zed.TypeMap:
 		return Implied(typ.KeyType) && Implied(typ.ValType)
 	}
 	return false
@@ -44,20 +44,20 @@ func Implied(typ zng.Type) bool {
 // names are present in the value.  In the former case, a decorated typedef can
 // use the abbreviated form "(= <name>)", while the letter case, a type def must use
 // the longer form "<value> (<name> = (<type>))".
-func SelfDescribing(typ zng.Type) bool {
+func SelfDescribing(typ zed.Type) bool {
 	if Implied(typ) {
 		return true
 	}
 	switch typ := typ.(type) {
-	case *zng.TypeRecord, *zng.TypeArray, *zng.TypeSet, *zng.TypeMap:
+	case *zed.TypeRecord, *zed.TypeArray, *zed.TypeSet, *zed.TypeMap:
 		return true
-	case *zng.TypeAlias:
+	case *zed.TypeAlias:
 		return SelfDescribing(typ.Type)
 	}
 	return false
 }
 
-func ParseType(zctx *Context, zson string) (zng.Type, error) {
+func ParseType(zctx *Context, zson string) (zed.Type, error) {
 	zp, err := NewParser(strings.NewReader(zson))
 	if err != nil {
 		return nil, err
@@ -69,30 +69,30 @@ func ParseType(zctx *Context, zson string) (zng.Type, error) {
 	return NewAnalyzer().convertType(zctx, ast)
 }
 
-func ParseValue(zctx *Context, zson string) (zng.Value, error) {
+func ParseValue(zctx *Context, zson string) (zed.Value, error) {
 	zp, err := NewParser(strings.NewReader(zson))
 	if err != nil {
-		return zng.Value{}, err
+		return zed.Value{}, err
 	}
 	ast, err := zp.ParseValue()
 	if err != nil {
-		return zng.Value{}, err
+		return zed.Value{}, err
 	}
 	val, err := NewAnalyzer().ConvertValue(zctx, ast)
 	if err != nil {
-		return zng.Value{}, err
+		return zed.Value{}, err
 	}
 	return Build(zcode.NewBuilder(), val)
 }
 
-func ParseValueFromAST(zctx *Context, ast zed.Value) (zng.Value, error) {
+func ParseValueFromAST(zctx *Context, ast zed.Value) (zed.Value, error) {
 	val, err := NewAnalyzer().ConvertValue(zctx, ast)
 	if err != nil {
-		return zng.Value{}, err
+		return zed.Value{}, err
 	}
 	return Build(zcode.NewBuilder(), val)
 }
 
-func TranslateType(zctx *Context, astType zed.Type) (zng.Type, error) {
+func TranslateType(zctx *Context, astType zed.Type) (zed.Type, error) {
 	return NewAnalyzer().convertType(zctx, astType)
 }

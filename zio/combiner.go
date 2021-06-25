@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/brimdata/zed/zng"
+	"github.com/brimdata/zed"
 )
 
 // A Combiner is a Reader that returns records by reading from multiple Readers.
@@ -31,7 +31,7 @@ func NewCombiner(ctx context.Context, readers []Reader) *Combiner {
 type combinerResult struct {
 	err error
 	idx int
-	rec *zng.Record
+	rec *zed.Record
 }
 
 func (c *Combiner) run() {
@@ -62,7 +62,7 @@ func (c *Combiner) finished() bool {
 	return true
 }
 
-func (c *Combiner) Read() (*zng.Record, error) {
+func (c *Combiner) Read() (*zed.Record, error) {
 	c.once.Do(c.run)
 	for {
 		select {

@@ -3,14 +3,14 @@ package resolver
 import (
 	"sync"
 
-	"github.com/brimdata/zed/zng"
+	"github.com/brimdata/zed"
 	"github.com/brimdata/zed/zson"
 )
 
 type Mapper struct {
 	outputCtx *zson.Context
 	mu        sync.RWMutex
-	types     []zng.Type
+	types     []zed.Type
 }
 
 func NewMapper(out *zson.Context) *Mapper {
@@ -25,7 +25,7 @@ func NewMapper(out *zson.Context) *Mapper {
 // threads attempt to update the same ID, but it is safe because the
 // outputContext will return the same the pointer so the second update
 // does not change anything.
-func (m *Mapper) Lookup(td int) zng.Type {
+func (m *Mapper) Lookup(td int) zed.Type {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	if td < len(m.types) {
@@ -34,7 +34,7 @@ func (m *Mapper) Lookup(td int) zng.Type {
 	return nil
 }
 
-func (m *Mapper) Enter(id int, ext zng.Type) (zng.Type, error) {
+func (m *Mapper) Enter(id int, ext zed.Type) (zed.Type, error) {
 	typ, err := m.outputCtx.TranslateType(ext)
 	if err != nil {
 		return nil, err
@@ -46,10 +46,10 @@ func (m *Mapper) Enter(id int, ext zng.Type) (zng.Type, error) {
 	return nil, nil
 }
 
-func (m *Mapper) EnterType(td int, typ zng.Type) {
+func (m *Mapper) EnterType(td int, typ zed.Type) {
 	m.mu.Lock()
 	if td >= cap(m.types) {
-		new := make([]zng.Type, td+1, td*2)
+		new := make([]zed.Type, td+1, td*2)
 		copy(new, m.types)
 		m.types = new
 	} else if td >= len(m.types) {

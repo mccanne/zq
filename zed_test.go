@@ -1,4 +1,4 @@
-package zed
+package zed_test
 
 import (
 	"fmt"

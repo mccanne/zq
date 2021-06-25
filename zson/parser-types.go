@@ -3,8 +3,8 @@ package zson
 import (
 	"unicode"
 
+	"github.com/brimdata/zed"
 	"github.com/brimdata/zed/compiler/ast/zed"
-	"github.com/brimdata/zed/zng"
 )
 
 func (p *Parser) parseType() (zed.Type, error) {
@@ -44,7 +44,7 @@ func (p *Parser) matchIdentifier() (string, error) {
 		return "", err
 	}
 	r, _, err := l.peekRune()
-	if err != nil || !zng.IDChar(r) {
+	if err != nil || !zed.IDChar(r) {
 		return "", err
 	}
 	return l.scanIdentifier()
@@ -59,14 +59,14 @@ func (p *Parser) matchTypeName() (zed.Type, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !(zng.IDChar(r) || unicode.IsDigit(r)) {
+	if !(zed.IDChar(r) || unicode.IsDigit(r)) {
 		return nil, nil
 	}
 	name, err := l.scanTypeName()
 	if err != nil {
 		return nil, err
 	}
-	if t := zng.LookupPrimitive(name); t != nil {
+	if t := zed.LookupPrimitive(name); t != nil {
 		return &zed.TypePrimitive{"TypePrimitive", name}, nil
 	}
 	// Wherever we have a type name, we can have a type def defining the

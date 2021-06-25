@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/brimdata/zed/zng"
+	"github.com/brimdata/zed"
 )
 
 func Extension(format string) string {
@@ -54,11 +54,11 @@ func NopCloser(w io.Writer) io.WriteCloser {
 // Read never returns a non-nil record and non-nil error together, and it never
 // returns io.EOF.
 type Reader interface {
-	Read() (*zng.Record, error)
+	Read() (*zed.Record, error)
 }
 
 type Writer interface {
-	Write(*zng.Record) error
+	Write(*zed.Record) error
 }
 
 type ReadCloser interface {
@@ -107,7 +107,7 @@ type concatReader struct {
 	readers []Reader
 }
 
-func (c *concatReader) Read() (*zng.Record, error) {
+func (c *concatReader) Read() (*zed.Record, error) {
 	for len(c.readers) > 0 {
 		rec, err := c.readers[0].Read()
 		if rec != nil || err != nil {
@@ -128,7 +128,7 @@ type multiWriter struct {
 	writers []Writer
 }
 
-func (m *multiWriter) Write(rec *zng.Record) error {
+func (m *multiWriter) Write(rec *zed.Record) error {
 	for _, w := range m.writers {
 		if err := w.Write(rec); err != nil {
 			return err

@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/brimdata/zed"
 	"github.com/brimdata/zed/compiler/ast/zed"
 	"github.com/brimdata/zed/pkg/nano"
 	"github.com/brimdata/zed/zcode"
-	"github.com/brimdata/zed/zng"
 )
 
 func (p *Parser) ParseValue() (zed.Value, error) {
@@ -588,16 +588,16 @@ func (p *Parser) matchTypeValue() (*zed.TypeValue, error) {
 	}, nil
 }
 
-func ParsePrimitive(typeText, valText string) (zng.Value, error) {
-	typ := zng.LookupPrimitive(typeText)
+func ParsePrimitive(typeText, valText string) (zed.Value, error) {
+	typ := zed.LookupPrimitive(typeText)
 	if typ == nil {
-		return zng.Value{}, fmt.Errorf("no such type: %s", typeText)
+		return zed.Value{}, fmt.Errorf("no such type: %s", typeText)
 	}
 	var b zcode.Builder
 	if err := BuildPrimitive(&b, Primitive{Type: typ, Text: valText}); err != nil {
-		return zng.Value{}, err
+		return zed.Value{}, err
 	}
 	it := b.Bytes().Iter()
 	bytes, _, _ := it.Next()
-	return zng.Value{typ, bytes}, nil
+	return zed.Value{typ, bytes}, nil
 }
