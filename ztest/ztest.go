@@ -119,11 +119,13 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"go/build/constraint"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -274,8 +276,9 @@ func (f *File) load(dir string) ([]byte, *regexp.Regexp, error) {
 
 // ZTest defines a ztest.
 type ZTest struct {
-	Skip string `yaml:"skip,omitempty"`
-	Tag  string `yaml:"tag,omitempty"`
+	Platform string `yaml:"platform,omitempty"`
+	Skip     string `yaml:"skip,omitempty"`
+	Tag      string `yaml:"tag,omitempty"`
 
 	// For Zed-style tests.
 	Zed         string `yaml:"zed,omitempty"`
@@ -379,10 +382,22 @@ func (z *ZTest) ShouldSkip(path string) string {
 		return "script test on in-process run"
 	case z.Skip != "":
 		return z.Skip
+	case z.Platform != "" && !matchPlatform(z.Platform):
+		return fmt.Sprintf("platform %q does not match", z.Platform)
 	case z.Tag != "" && z.Tag != os.Getenv("ZTEST_TAG"):
 		return fmt.Sprintf("tag %q does not match ZTEST_TAG=%q", z.Tag, os.Getenv("ZTEST_TAG"))
 	}
 	return ""
+}
+
+func matchPlatform(platform string) bool {
+	expr, err := constraint.Parse("//go:build " + platform)
+	if err != nil {
+		return false
+	}
+	return expr.Eval(func(tag string) bool {
+		return tag == runtime.GOARCH || tag == runtime.GOOS
+	})
 }
 
 func (z *ZTest) RunScript(testname, shellPath, workingDir, filename string) error {

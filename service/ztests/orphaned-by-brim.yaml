@@ -1,3 +1,5 @@
+platform: '!windows'
+
 script: |
   source mockbrim.sh
   zapi create -p test
