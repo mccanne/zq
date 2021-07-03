@@ -1,5 +1,13 @@
 # Zed Language
 
+An ambitious goal of the Zed project is to offer a language --- the Zed language ---
+that provides an easy learning curve and a gentle slope from simple  keyword search
+to log-search-style processing and ultimately to very sophisticated warehouse-scale
+capability.  The language also embraces a rich set of type operators based on the
+Zed type system for data shaping and flexible and easy ETL.
+
+The Zed language is designed to provide a
+
 The Zed system includes a powerful language for searching, analyzing, and
 shaping data. The language embraces a _pipeline_ syntax that should be familiar
 to those who have worked with UNIX shells. Here's a simple example query:
@@ -30,6 +38,6 @@ Zed _[Data Types](data-types/README.md)_.
 Each of the sections hyperlinked above describes these elements of the language
 in more detail. To make effective use of the materials, it is recommended to
 first review the [Documentation Conventions](conventions/README.md). You will
-likely also want to download a copy of the 
+likely also want to download a copy of the
 [Sample Data](https://github.com/brimdata/zed-sample-data) so you can reproduce
 the examples shown.
