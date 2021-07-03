@@ -1,16 +1,59 @@
 # Zed Language
 
 An ambitious goal of the Zed project is to offer a language --- the Zed language ---
-that provides an easy learning curve and a gentle slope from simple  keyword search
+that provides an easy learning curve and a gentle slope from simple keyword search
 to log-search-style processing and ultimately to very sophisticated warehouse-scale
 capability.  The language also embraces a rich set of type operators based on the
-Zed type system for data shaping and flexible and easy ETL.
+[Zed data model](../formats/zson.md) for data shaping and for flexible and easy ETL.
 
-The Zed language is designed to provide a
+The simplest Zed program is perhaps a sinlge word search, e.g.,
+```
+hello
+```
+This program searches the implied input for Zed records that
+contain the string "hello".
 
-The Zed system includes a powerful language for searching, analyzing, and
-shaping data. The language embraces a _pipeline_ syntax that should be familiar
-to those who have worked with UNIX shells. Here's a simple example query:
+> NOTE: we should clarify keyword search vs substring match.
+
+As with the unix shell and legacy log search systems,
+the Zed language embraces a _pipeline_ model where a source of data
+is treated as a stream then one or more operators concatenated with
+the `|` symbol transform, filter, and aggregate the stream.
+That said, the Zed language is declarative and
+the Zed compiler optimizes the data flow computation --- e.g., implementing
+a Zed program often differently than the flow implied by the pipeline
+yet reaching the same result --- much as a modern
+SQL engine optimizes a declarative SQL query.
+
+To facilitate both a programming-like model as well as an ad hoc search
+experience, the language has a canonical form that can be abbreviated
+using syntax that supports an agile interactive query workflow.
+For example, the canonical form of an aggregation uses the `summarize`
+keyword, as in
+```
+summarize count() by id
+```
+but this can be abbreviated by dropping the keyword whereby the compiler then
+uses the name of the aggregation function to resolve the ambiguity, e.g.,
+as in the shorter form
+```
+count() by id
+```
+Boolean expressions can also appear as simple search filters and these various
+operators composed in a simple to type and edit fashion:
+```
+hello | srcip in 128.32.0.0/16] | count() by id | count > 1000 | sort count
+```
+The canonical form here would be:
+```
+search hello
+  | filter srcip in 128.32.0.0/16]
+  | summarize count() by id |
+  | filter count > 1000
+  | sort count
+```
+
+Here's a simple example query:
 
 ![Example Zed 1](images/example-zed.png)
 
