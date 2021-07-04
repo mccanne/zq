@@ -1,6 +1,7 @@
 # Zed Language
 
-An ambitious goal of the Zed project is to offer a language --- the Zed language ---
+An ambitious goal of the Zed project is to offer a language
+&mdash; the _Zed language_ &mdash;
 that provides an easy learning curve and a gentle slope from simple keyword search
 to log-search-style processing and ultimately to sophisticated, large-scale
 warehouse-scale queries.  The language also embraces a rich set of type operators
@@ -53,7 +54,7 @@ The canonical Zed form here would be:
 ```
 filter match(widget)
   | filter price > 1000
-  | summarize count() by color |
+  | summarize count() by color
   | filter count > 1000
   | sort count
 ```
@@ -72,7 +73,7 @@ and, of course, the SQL and Zed forms can be mixed and matched:
 SELECT count(), color
 WHERE match(widget) AND ipsrc in 192.168.0.0/16
 GROUP BY color
-| count > 1000 | sort count
+  | count > 1000 | sort count
 ```
 While this hybrid capability of Zed may seem questionable, our goal here
 is to have the best of both worlds: the easy interactive workflow of Zed
@@ -86,7 +87,7 @@ that operates on heterogeneous data might look like this:
 not ipsrc in 192.168.0.0/16
 | bytes := sum(src_bytes + dst_bytes),
   maxdur := max(duration),
-  valid := or(status != "ok")
+  valid := and(status == "ok")
      by ipsrc, ipdst
 ```
 This filters out records in with `ipsrc` in network 192.168
