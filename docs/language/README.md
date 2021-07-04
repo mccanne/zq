@@ -19,7 +19,10 @@ contain the string "widget".
 As with the unix shell and legacy log search systems,
 the Zed language embraces a _pipeline_ model where a source of data
 is treated as a stream then one or more operators concatenated with
-the `|` symbol transform, filter, and aggregate the stream.
+the `|` symbol transform, filter, and aggregate the stream, e.g.,
+```
+widget | price > 1000
+```
 
 That said, the Zed language is declarative and
 the Zed compiler optimizes the data flow computation --- e.g., implementing
@@ -44,13 +47,13 @@ count() by id
 Boolean expressions can also appear as simple search filters and these various
 operators composed in a simple to type and edit fashion:
 ```
-widget | ipsrc in 192.168.0.0/16 | count() by id | count > 1000 | sort count
+widget | price > 1000 | count() by color | count > 1000 | sort count
 ```
 The canonical Zed form here would be:
 ```
 filter match(widget)
-  | filter ipsrc in 192.168.0.0/16
-  | summarize count() by id |
+  | filter price > 1000
+  | summarize count() by color |
   | filter count > 1000
   | sort count
 ```
@@ -58,34 +61,36 @@ To support adoption by the vast audience of users who know and love SQL,
 a key goal of Zed is to support a superset of the data query language (DQL) portion
 of ANSI SQL.  For example, the above query can also be written in Zed as
 ```
-SELECT count(), id
-WHERE match(hello) AND ipsrc in 128.32.0.0/16
-GROUP BY id
+SELECT count(), color
+WHERE match(hello) AND price > 1000
+GROUP BY color
 HAVING count > 1000
 ORDER BY count
 ```
 and, of course, the SQL and Zed forms can be mixed and matched:
 ```
-SELECT count(), id
+SELECT count(), color
 WHERE match(widget) AND ipsrc in 192.168.0.0/16
-GROUP BY id
+GROUP BY color
 | count > 1000 | sort count
 ```
-While this hybrid capability of Zed is easy to question, the goal here
-is to  have the best of both worlds: simple and easy interactive workflow UX
-of Zed combined with the precision and familiarity of SQL.
+While this hybrid capability of Zed may seem questionable, our goal here
+is to have the best of both worlds: the easy interactive workflow of Zed
+combined with the ubiquity and familiarity of SQL.
 
-Moreover, the Zed data model
-is based on a heterogenous sequence of arbitrarily typed semi-structured records
-and the Zed language is a better fit here compared to SQL.  For example, an aggregation
+And because the Zed data model
+is based on a heterogenous sequence of arbitrarily typed semi-structured records,
+the Zed language is often better fit here compared to SQL.  For example, an aggregation
 that operates on heterogeneous data might look like this:
 ```
-bytes := sum(src_bytes + dst_bytes),
-maxdur := max(duration),
-valid := or(status != "ok")
+not ipsrc in 192.168.0.0/16
+| bytes := sum(src_bytes + dst_bytes),
+  maxdur := max(duration),
+  valid := or(status != "ok")
      by ipsrc, ipdst
 ```
-This computes the aggregation over all records that have the `ipsrc` and `ipdst`
+This filters out records in with `ipsrc` in network 192.168
+and computes the aggregation over all such records that have the `ipsrc` and `ipdst`
 fields where some record have a `status` field, other record
 have a `duration` field and yet other record have
 `src_bytes` and `dst_bytes` fields.  Because Zed is more relaxed than SQL,
