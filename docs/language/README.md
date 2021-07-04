@@ -26,10 +26,10 @@ widget | price > 1000
 ```
 
 That said, the Zed language is declarative and
-the Zed compiler optimizes the data flow computation --- e.g., implementing
-a Zed program often differently than the flow implied by the pipeline
-yet reaching the same result --- much as a modern
-SQL engine optimizes a declarative SQL query.
+the Zed compiler optimizes the data flow computation
+&mdash; e.g., implementing a Zed program often differently than
+the flow implied by the pipeline yet reaching the same result &mdash;
+much as a modern SQL engine optimizes a declarative SQL query.
 
 To facilitate both a programming-like model as well as an ad hoc search
 experience, the language has a canonical form that can be abbreviated
@@ -96,7 +96,8 @@ fields where some record have a `status` field, other record
 have a `duration` field and yet other record have
 `src_bytes` and `dst_bytes` fields.  Because Zed is more relaxed than SQL,
 you can throw together a bunch of related data of different types into a "data pool"
-without having to define any upfront schemas --- let alone a schema per table ---
+without having to define any upfront schemas
+&mdash; let alone a schema per table &mdash;
 thereby enabling easy-to-write queries over heterogenous pools of data.
 Writing a SQL query for the different record types here would require complicated
 table references, nested selects, and joins.
