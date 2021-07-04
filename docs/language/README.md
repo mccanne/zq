@@ -35,7 +35,7 @@ For example, the query from above is more efficiently implemented as
 a boolean AND operation instead of two pipeline stages,
 so the compiler is free to transform it to
 ```
-widget AND price > 1000
+widget and price > 1000
 ```
 And since the "AND" syntax is optional (logical AND can be expressed as
 concatenation), this query can also be expressed as
@@ -58,26 +58,29 @@ as in the shorter form
 count() by id
 ```
 Similarly, the canonical form of a search expression is a `filter` operator
-and the example from above would be written as
-
+(and the "AND" operator is explicit in canonical form),
+so the example from above would be written canonically as
+```
+filter widget and price > 1000
+```
 Boolean expressions can also appear as simple search filters and these various
 operators composed in a simple to type and edit fashion:
 ```
 widget price > 1000 | count() by color | count >= 10 | sort count
 ```
-The canonical Zed form here would be:
+The canonical form of this more complex query is:
 ```
-filter widget price > 1000
+filter widget and price > 1000
   | summarize count() by color
   | filter count >= 10
   | sort count
 ```
-To support adoption by the vast audience of users who know and love SQL,
+To encourage adoption by the vast audience of users who know and love SQL,
 a key goal of Zed is to support a superset of the data query language (DQL) portion
 of ANSI SQL.  For example, the above query can also be written in Zed as
 ```
 SELECT count(), color
-WHERE widget price > 1000
+WHERE widget AND price > 1000
 GROUP BY color
 HAVING count >= 10
 ORDER BY count
@@ -86,7 +89,7 @@ i.e., this SQL expression is a subset of the Zed language.
 Naturally, the SQL and Zed forms can be mixed and matched:
 ```
 SELECT count(), color
-WHERE widget price > 1000
+WHERE widget AND price > 1000
 GROUP BY color
   | count >= 10 | sort count
 ```
@@ -100,26 +103,39 @@ the Zed language is often better fit here compared to SQL.  For example, an aggr
 that operates on heterogeneous data might look like this:
 ```
 not srcip in 192.168.0.0/16
-| bytes := sum(src_bytes + dst_bytes),
-  maxdur := max(duration),
-  valid := and(status == "ok")
-     by srcip, dstip
+| summarize
+    bytes := sum(src_bytes + dst_bytes),
+    maxdur := max(duration),
+    valid := and(status == "ok")
+      by srcip, dstip
 ```
-This filters out records in with `srcip` in network 192.168
-and computes the aggregation over all such records that have the `srcip` and `dstip`
-fields where some record have a `status` field, other record
-have a `duration` field and yet other record have
+This query filters out records in with `srcip` in network 192.168
+and computes three aggregations over all such records that have the `srcip` and `dstip`
+fields where some record have a `status` field, other records
+have a `duration` field and yet other records have
 `src_bytes` and `dst_bytes` fields.  Because Zed is more relaxed than SQL,
 you can throw together a bunch of related data of different types into a "data pool"
 without having to define any upfront schemas
 &mdash; let alone a schema per table &mdash;
 thereby enabling easy-to-write queries over heterogenous pools of data.
-Writing an equivlant SQL query for the different record types implied above
+Writing an equivalent SQL query for the different record types implied above
 would require complicated table references, nested selects, and multi-way joins.
 
 > NOTE that the SQL expression implementation is currently in prototype stage.
 > If you try it out, you may run into problems and we'd love your
 > feedback for where it breaks and how it can be improved.
+
+## Data Sources
+
+In the examples, above the data source is implied.  For example, the
+`zed query` command takes a list of files and the concatenated files
+are the implied input.  Likewise, in the Brim app, the UI selects a
+data source and key range.
+
+Data sources can also be explicitly specified using the `from` keyword.
+Depending on the operating context, `from` make take a file path argument
+relative to the local file system, an HTTP URL, an S3 URL, or in the
+context of a Zed lake, the name of a data pool.
 
 ## Directed-acyclic Flow Graphs
 
@@ -130,7 +146,22 @@ undefined order), merged (in a defined order) by one or more sort keys,
 or joined using relational join logic.
 
 Generally speaking, a flowgraph defines a directed acyclic graph (DAG) composed
-of data sources and operator nodes.  Here is an example:
+of data sources and operator nodes.
+
+A data path can be split with the `split` operator as in
+```
+from PoolOne | split (
+  => op1 | op2 | ...
+  => op1 | op2 | ...
+) | merge ts | ...
+```
+Or multiple pools can be accessed and, for example, joined...
+```
+from (
+  PoolOne => op1 | op2 | ... ;
+  PoolTwo => op1 | op2 | ... ;
+) | join on key=key | ...
+```
 
 XXX change this example to a flowgraph
 
