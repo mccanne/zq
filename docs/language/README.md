@@ -31,8 +31,20 @@ the Zed compiler optimizes the data flow computation
 the flow implied by the pipeline yet reaching the same result &mdash;
 much as a modern SQL engine optimizes a declarative SQL query.
 
+For example, the query from above is more efficiently implemented as
+a boolean AND operation instead of two pipeline stages,
+so the compiler is free to transform it to
+```
+widget AND price > 1000
+```
+And since the "AND" syntax is optional (logical AND can be expressed as
+concatenation), this query can also be expressed as
+```
+widget price > 1000
+```
+
 To facilitate both a programming-like model as well as an ad hoc search
-experience, the language has a canonical form that can be abbreviated
+experience, Zed has a canonical, long form that can be abbreviated
 using syntax that supports an agile interactive query workflow.
 For example, the canonical form of an aggregation uses the `summarize`
 keyword, as in
@@ -45,17 +57,19 @@ as in the shorter form
 ```
 count() by id
 ```
+Similarly, the canonical form of a search expression is a `filter` operator
+and the example from above would be written as
+
 Boolean expressions can also appear as simple search filters and these various
 operators composed in a simple to type and edit fashion:
 ```
-widget | price > 1000 | count() by color | count > 1000 | sort count
+widget price > 1000 | count() by color | count >= 10 | sort count
 ```
 The canonical Zed form here would be:
 ```
-filter match(widget)
-  | filter price > 1000
+filter widget price > 1000
   | summarize count() by color
-  | filter count > 1000
+  | filter count >= 10
   | sort count
 ```
 To support adoption by the vast audience of users who know and love SQL,
@@ -63,18 +77,18 @@ a key goal of Zed is to support a superset of the data query language (DQL) port
 of ANSI SQL.  For example, the above query can also be written in Zed as
 ```
 SELECT count(), color
-WHERE match(hello) AND price > 1000
+WHERE widget price > 1000
 GROUP BY color
-HAVING count > 1000
+HAVING count >= 10
 ORDER BY count
 ```
 i.e., this SQL expression is a subset of the Zed language.
 Naturally, the SQL and Zed forms can be mixed and matched:
 ```
 SELECT count(), color
-WHERE match(widget) AND srcip in 192.168.0.0/16
+WHERE widget price > 1000
 GROUP BY color
-  | count > 1000 | sort count
+  | count >= 10 | sort count
 ```
 While this hybrid capability of Zed may seem questionable, our goal here
 is to have the best of both worlds: the easy interactive workflow of Zed
