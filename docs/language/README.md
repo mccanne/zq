@@ -49,13 +49,13 @@ using syntax that supports an agile interactive query workflow.
 For example, the canonical form of an aggregation uses the `summarize`
 keyword, as in
 ```
-summarize count() by id
+summarize count() by color
 ```
 but this can be abbreviated by dropping the keyword whereby the compiler then
 uses the name of the aggregation function to resolve the ambiguity, e.g.,
 as in the shorter form
 ```
-count() by id
+count() by color
 ```
 Similarly, the canonical form of a search expression is a `filter` operator
 (and the "AND" operator is explicit in canonical form),
@@ -63,8 +63,12 @@ so the example from above would be written canonically as
 ```
 filter widget and price > 1000
 ```
-Boolean expressions can also appear as simple search filters and these various
-operators composed in a simple to type and edit fashion:
+Unlike typical log search systems, the Zed language operators are uniform:
+you can specify an operator including keyword search terms, boolean predicates,
+etc using the same syntax at any point in the pipeline.  For example,
+the predicate `count >= 10` can simply be tacked onto the output of a
+count aggregation using the filter from above and perhaps sorting
+the final about by `count` in a simple to type and edit fashion:
 ```
 widget price > 1000 | count() by color | count >= 10 | sort count
 ```
@@ -143,7 +147,8 @@ While the examples above all illustrate a linear sequence of operations,
 Zed programs can include multiple data sources and splitting operations
 where multiple paths run in parallel and paths can be combined (in an
 undefined order), merged (in a defined order) by one or more sort keys,
-or joined using relational join logic.
+or joined using relational join logic (currently only merge-based equijoin
+is supported).
 
 Generally speaking, a flowgraph defines a directed acyclic graph (DAG) composed
 of data sources and operator nodes.
@@ -162,6 +167,26 @@ from (
   PoolTwo => op1 | op2 | ... ;
 ) | join on key=key | ...
 ```
+Similarly, data can be routed to different paths with replication
+using `switch`:
+```
+from ... | switch (
+  case color == "red" => op1 | op2 | ...
+  case color == "blue" => op1 | op2 | ...
+  case * => op1 | op2 | ...
+) | ...
+```
+
+> TBD: (MOVE THIS TO AN ISSUE)
+> In writing the switch example, I think we should unify the syntax with  
+> split by dropping the "case" keyword and using semicolon for path termination.
+> Also, we should have a form where you can switch on an expr and have a
+> "default" keyword, e.g.,
+>   switch color (
+>     "red" => op1 | op2 | ...
+>     "blue" => op1 | op2 | ...
+>     default => op1 | op2 | ...
+>   )
 
 XXX change this example to a flowgraph
 
