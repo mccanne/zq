@@ -75,9 +75,9 @@ widget price > 1000 | count() by color | count >= 10 | sort count
 The canonical form of this more complex query is:
 ```
 filter widget and price > 1000
-  | summarize count() by color
-  | filter count >= 10
-  | sort count
+| summarize count() by color
+| filter count >= 10
+| sort count
 ```
 To encourage adoption by the vast audience of users who know and love SQL,
 a key goal of Zed is to support a superset of the data query language (DQL) portion
@@ -95,7 +95,7 @@ Naturally, the SQL and Zed forms can be mixed and matched:
 SELECT count(), color
 WHERE widget AND price > 1000
 GROUP BY color
-  | count >= 10 | sort count
+| count >= 10 | sort count
 ```
 While this hybrid capability of Zed may seem questionable, our goal here
 is to have the best of both worlds: the easy interactive workflow of Zed
