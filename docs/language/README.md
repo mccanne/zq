@@ -212,6 +212,7 @@ filter widget
 | put COLOR := to_upper(color)
 ```
 can be abbreviated as
+```
 widget | count() by color  | COLOR := to_upper(color)
 ```
 as the compiler can tell from syntax and context that the three operators
