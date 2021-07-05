@@ -1,4 +1,26 @@
-# Zed Language
+# The Zed Language
+
+## TL;DR
+
+Zed is a pipeline-style search and analytics language for querying
+data in files, over HTTP, in S3 storage, or in a data lake.
+A simple Zed query has the following structure:
+
+![Example Zed 1](images/example-zed.png)
+
+As is typical with pipelines, you can imagine the data flowing left-to-right
+through this chain of processing elements, such that the output of each element
+is the input to the next.  While Zed follows the common pattern seen in
+other query languages where the pipeline begins with a search and further
+processing is then performed on the isolated data, one of Zed's
+strengths is that searches and expressions can appear in any order in the
+pipeline.
+
+![Example Zed 2](images/example-zed-operator-search.png)
+
+A complete list of [Zed operators](#operators) is found below.
+
+## Background
 
 An ambitious goal of the Zed project is to offer a language
 &mdash; the _Zed language_ &mdash;
@@ -79,6 +101,9 @@ filter widget and price > 1000
 | filter count >= 10
 | sort count
 ```
+
+## SQL Compatiblity
+
 To encourage adoption by the vast audience of users who know and love SQL,
 a key goal of Zed is to support a superset of the data query language (DQL) portion
 of ANSI SQL.  For example, the above query can also be written in Zed as
@@ -190,8 +215,6 @@ from ... | switch (
 
 ## Operators
 
-XXX work in progress
-
 Each operator performs a specific operation on a stream of records and
 is identified by name.  The entire list of operators is documented
 in the [Zed Operator Reference](operators/README.md).
@@ -256,18 +279,6 @@ widget or 123 or count > 10 or not (color == "red" or color == "blue")
 ```
 
 ### Summarize
-
-![Example Zed 1](images/example-zed.png)
-
-As is typical with pipelines, you can imagine the data flowing left-to-right
-through this chain of processing elements, such that the output of each element
-is the input to the next.  While Zed follows the common pattern seen in
-other query languages where the pipeline begins with a search and further
-processing is then performed on the isolated data, one of Zed's
-strengths is that searches and expressions can appear in any order in the
-pipeline.
-
-![Example Zed 2](images/example-zed-operator-search.png)
 
 The available pipeline elements are broadly categorized into:
 
