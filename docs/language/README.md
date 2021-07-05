@@ -213,7 +213,7 @@ filter widget
 ```
 can be abbreviated as
 ```
-widget | count() by color  | COLOR := to_upper(color)
+widget | count() by color | COLOR := to_upper(color)
 ```
 as the compiler can tell from syntax and context that the three operators
 are a filter, summarize, and put.
