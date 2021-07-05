@@ -205,7 +205,24 @@ They include:
 * _summarize_ - perform zero or more aggregations with optional group-by keys
 * _put_ - add or modify fields to records
 
+For example, the canonical form of
+```
+filter widget
+| summarize count() by color
+| put COLOR := to_upper(color)
+```
+can be abbreviated as
+widget | count() by color  | COLOR := to_upper(color)
+```
+as the compiler can tell from syntax and context that the three operators
+are a filter, summarize, and put.
+
 All other operators are explicitly named.
+
+# TODO
+
+Put here a list of all the operators with a link to each markdown file,
+one per operator.
 
 ### Filter
 
