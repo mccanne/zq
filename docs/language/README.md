@@ -3,7 +3,8 @@
 ## TL;DR
 
 Zed is a pipeline-style search and analytics language for querying
-data in files, over HTTP, in S3 storage, or in a data lake.
+data in files, over HTTP, in S3 storage, or in a
+[Zed data lake](../lake).
 A simple Zed query has the following structure:
 
 ![Example Zed 1](images/example-zed.png)
