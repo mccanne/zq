@@ -215,7 +215,7 @@ For three important and commonly used set of operators, the operator name
 is optional as the compiler can determine from syntax and context which operator
 is intended.  This promotes an easy-to-type, interactive UX
 for these common use cases.  They include:
-* _filter_ - drops all input that does no match a specified [search expression](search-syntax/README.md)
+* _filter_ - selects only the records that match a specified [search expression](search-syntax/README.md)
 * _summarize_ - perform zero or more aggregations with optional group-by keys
 * _put_ - add or modify fields to records
 
