@@ -6,7 +6,7 @@ script: |
   zq "tail 900" babble.zson | zed lake load -p asc -seekstride=2000B -q -
   zq "head 250" babble.zson | zed lake load -p asc -seekstride=2000B -q -
   zed lake query -z -s "from asc | count()"
-  echo === | tee /dev/stderr
+  echo ===; echo === >&2
   zq "tail 900" babble.zson | zed lake load -p desc -seekstride=2000B -q -
   zq "head 250" babble.zson | zed lake load -p desc -seekstride=2000B -q -
   zed lake query -z -s "from desc | count()"

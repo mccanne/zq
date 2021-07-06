@@ -1,7 +1,11 @@
 script: |
-  zq -i zst /dev/null
+  zq -i zst empty
+
+inputs:
+  - name: empty
+    data: ''
 
 outputs:
   - name: stderr
-    regexp: |
-      .*: zst trailer not found
+    data: |
+      empty: zst trailer not found
