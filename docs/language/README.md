@@ -197,9 +197,9 @@ from (
 Similarly, data can be routed to different paths with replication
 using `switch`:
 ```
-from ... | switch (
-  color == "red" => op1 | op2 | ... ;
-  color == "blue" => op1 | op2 | ... ;
+from ... | switch color (
+  "red" => op1 | op2 | ... ;
+  "blue" => op1 | op2 | ... ;
   default => op1 | op2 | ...
 ) | ...
 ```
