@@ -176,13 +176,15 @@ or joined using relational join logic (currently only merge-based equijoin
 is supported).
 
 Generally speaking, a flowgraph defines a directed acyclic graph (DAG) composed
-of data sources and operator nodes.
+of data sources and operator nodes.  The Zed syntax leverages "fat arrows",
+i.e., `=>`, to indicate the start of a parallel paths and terminates each
+parallel path with a semicolon.
 
 A data path can be split with the `split` operator as in
 ```
 from PoolOne | split (
-  => op1 | op2 | ...
-  => op1 | op2 | ...
+  => op1 | op2 | ... ;
+  => op1 | op2 | ... ;
 ) | merge ts | ...
 ```
 Or multiple pools can be accessed and, for example, joined...
@@ -196,35 +198,23 @@ Similarly, data can be routed to different paths with replication
 using `switch`:
 ```
 from ... | switch (
-  case color == "red" => op1 | op2 | ...
-  case color == "blue" => op1 | op2 | ...
-  case * => op1 | op2 | ...
+  color == "red" => op1 | op2 | ... ;
+  color == "blue" => op1 | op2 | ... ;
+  default => op1 | op2 | ...
 ) | ...
 ```
 
-> TBD: (MOVE THIS TO AN ISSUE)
-> In writing the switch example, I think we should unify the syntax with  
-> split by dropping the "case" keyword and using semicolon for path termination.
-> Also, we should have a form where you can switch on an expr and have a
-> "default" keyword, e.g.,
->   switch color (
->     "red" => op1 | op2 | ...
->     "blue" => op1 | op2 | ...
->     default => op1 | op2 | ...
->   )
-
 ## Operators
 
-Each operator performs a specific operation on a stream of records and
-is identified by name.  The entire list of operators is documented
+Each operator is identified by name and performs a specific operation
+on a stream of records.  The entire list of operators is documented
 in the [Zed Operator Reference](operators/README.md).
 
 For three important and commonly used set of operators, the operator name
-is optional as the compiler can determine from syntax and context, which of the
-unnamed operators is intended.
-  This promotes an easy-to-type UX for these common use cases.
-They include:
-* _filter_ - drops all input that does no match a specified search expression
+is optional as the compiler can determine from syntax and context which operator
+is intended.  This promotes an easy-to-type, interactive UX
+for these common use cases.  They include:
+* _filter_ - drops all input that does no match a specified [search expression](search-syntax/README.md)
 * _summarize_ - perform zero or more aggregations with optional group-by keys
 * _put_ - add or modify fields to records
 
@@ -243,50 +233,28 @@ are a filter, summarize, and put.
 
 All other operators are explicitly named.
 
-# TODO
+* [`cut`](operators/README.md#cut)
+* [`drop`](operators/README.md#drop)
+* [`filter`](operators/README.md#filter)
+* [`fuse`](operators/README.md#fuse)
+* [`head`](operators/README.md#head)
+* [`join`](operators/README.md#join)
+* [`pick`](operators/README.md#pick)
+* [`put`](operators/README.md#put)
+* [`rename`](operators/README.md#rename)
+* [`sort`](operators/README.md#sort)
+* [`summarize`](aggregate-functions/README.md)
+* [`tail`](operators/README.md#tail)
+* [`uniq`](operators/README.md#uniq)
 
-Put here a list of all the operators with a link to each markdown file,
-one per operator.
+### TODO
 
-### Filter
+* merge
+* split
+* switch
+* from
 
-The filter operator takes a
-[search expression](search-syntax/README.md),
-which consists of literal matches, glob matches, regular expression matches,
-boolean expression predicates, or any of the above intermixed using
-boolean logic (AND, OR, NOT), where the AND operator can be elided and replaced
-with concatenation.
-
-For literal matches, the literal is searched across all of the values in a
-record including nested values.  For string literals, any substring of a larger
-string field may match as well well as any field name.
-For non-string literals, fields that are compatible with the literal's
-type are searched for an exact
-
-When searching for string literals in a search expression, quotes are optional
-when the string is a simple identifier that does not conflict with Zed
-reserved keywords.  This provides the look and feel of a search language
-like email search or log search while being embedded with the much broader
-Zed language and makes interactive searching more agile.
-
-For example, this search expression combines various search idioms
-```
-widget or 123 or foo*bar or "hello, world" or 192.168.1.1 or /foo.*bar/
-```
-while this expression includes boolean predicates and logic
-```
-widget or 123 or count > 10 or not (color == "red" or color == "blue")
-```
-
-### Summarize
-
-The available pipeline elements are broadly categorized into:
-
-* _[Searches](search-syntax/README.md)_ that isolate subsets of your data,
-* _[Operators](operators/README.md)_ that transform or filter records,
-* _[Expressions](expressions/README.md)_ for invoking functions or performing math and string processing on values,
-* _[Aggregate Functions](aggregate-functions/README.md)_ that carry out running computations based on the values of fields in successive events, and
-* _[Grouping](grouping/README.md)_ techniques to partition data based on field values.
+## Conventions
 
 To build effective queries, it is also important to become familiar with the
 Zed _[Data Types](data-types/README.md)_.
