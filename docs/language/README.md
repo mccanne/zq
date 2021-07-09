@@ -3,15 +3,16 @@
 ## TL;DR
 
 Zed is a pipeline-style search and analytics language for querying
-data in files, over HTTP, in S3 storage, or in a
-[Zed data lake](../lake).
-A simple Zed query has the following structure:
+data in files, over HTTP, in S3 cloud storage, or in a
+[Zed data lake](../lake/design.md).
+
+This simple example shows typical Zed query structure:
 
 ![Example Zed 1](images/example-zed.png)
 
 As is typical with pipelines, you can imagine the data flowing left-to-right
 through this chain of processing elements, such that the output of each element
-is the input to the next.  While Zed follows the common pattern seen in
+is the input to the next.  While Zed provides the common pattern seen in
 other query languages where the pipeline begins with a search and further
 processing is then performed on the isolated data, one of Zed's
 strengths is that searches and expressions can appear in any order in the
@@ -19,9 +20,12 @@ pipeline.
 
 ![Example Zed 2](images/example-zed-operator-search.png)
 
-A complete list of [Zed operators](#operators) is found below.
+You can skip ahead to learning about the [search syntax](search-syntax/README.md)
+or browse the complete list of [Zed operators](#operators) below. However, we
+recommend continuing on to read a bit what makes Zed unique and how it relates
+to other common data languages such as SQL.
 
-## Background
+## Background and Language Approach
 
 An ambitious goal of the Zed project is to offer a language
 &mdash; the _Zed language_ &mdash;
@@ -40,18 +44,18 @@ contain the string "widget".
 
 > NOTE: we should clarify keyword search vs substring match.
 
-As with the unix shell and legacy log search systems,
+As with the Unix shell and legacy log search systems,
 the Zed language embraces a _pipeline_ model where a source of data
-is treated as a stream then one or more operators concatenated with
+is treated as a stream, then one or more operators concatenated with
 the `|` symbol transform, filter, and aggregate the stream, e.g.,
 ```
 widget | price > 1000
 ```
 
-That said, the Zed language is declarative and
+That said, the Zed language is [declarative](https://en.wikipedia.org/wiki/Declarative_programming) and
 the Zed compiler optimizes the data flow computation
 &mdash; e.g., implementing a Zed program often differently than
-the flow implied by the pipeline yet reaching the same result &mdash;
+the flow implied by the pipeline, yet reaching the same result &mdash;
 much as a modern SQL engine optimizes a declarative SQL query.
 
 For example, the query from above is more efficiently implemented as
@@ -88,10 +92,10 @@ filter widget and price > 1000
 ```
 Unlike typical log search systems, the Zed language operators are uniform:
 you can specify an operator including keyword search terms, boolean predicates,
-etc using the same syntax at any point in the pipeline.  For example,
+etc. using the same syntax at any point in the pipeline.  For example,
 the predicate `count >= 10` can simply be tacked onto the output of a
 count aggregation using the filter from above and perhaps sorting
-the final about by `count` in a simple to type and edit fashion:
+the final about by `count` in a way that's simple to type and edit.
 ```
 widget price > 1000 | count() by color | count >= 10 | sort count
 ```
@@ -107,7 +111,8 @@ filter widget and price > 1000
 
 To encourage adoption by the vast audience of users who know and love SQL,
 a key goal of Zed is to support a superset of the data query language (DQL) portion
-of ANSI SQL.  For example, the above query can also be written in Zed as
+of [ANSI SQL](https://blog.ansi.org/2018/10/sql-standard-iso-iec-9075-2016-ansi-x3-135/#gref).
+For example, the above query can also be written in Zed as
 ```
 SELECT count(), color
 WHERE widget AND price > 1000
@@ -116,7 +121,7 @@ HAVING count >= 10
 ORDER BY count
 ```
 i.e., this SQL expression is a subset of the Zed language.
-Naturally, the SQL and Zed forms can be mixed and matched:
+Uniquely, the SQL and Zed forms can be mixed and matched:
 ```
 SELECT count(), color
 WHERE widget AND price > 1000
@@ -128,7 +133,7 @@ is to have the best of both worlds: the easy interactive workflow of Zed
 combined with the ubiquity and familiarity of SQL.
 
 And because the Zed data model
-is based on a heterogenous sequence of arbitrarily typed semi-structured records,
+is based on a heterogenous sequence of arbitrarily-typed, semi-structured records,
 the Zed language is often better fit here compared to SQL.  For example, an aggregation
 that operates on heterogeneous data might look like this:
 ```
@@ -139,31 +144,33 @@ not srcip in 192.168.0.0/16
     valid := and(status == "ok")
       by srcip, dstip
 ```
-This query filters out records in with `srcip` in network 192.168
+This query filters out records in which `srcip` is in the network 192.168
 and computes three aggregations over all such records that have the `srcip` and `dstip`
 fields where some record have a `status` field, other records
-have a `duration` field and yet other records have
+have a `duration` field, and yet other records have
 `src_bytes` and `dst_bytes` fields.  Because Zed is more relaxed than SQL,
-you can throw together a bunch of related data of different types into a "data pool"
+you can mix a bunch of related data of different types into a "data pool"
 without having to define any upfront schemas
 &mdash; let alone a schema per table &mdash;
 thereby enabling easy-to-write queries over heterogenous pools of data.
 Writing an equivalent SQL query for the different record types implied above
 would require complicated table references, nested selects, and multi-way joins.
 
-> NOTE that the SQL expression implementation is currently in prototype stage.
+> **Note:** The SQL expression implementation is currently in prototype stage.
 > If you try it out, you may run into problems and we'd love your
-> feedback for where it breaks and how it can be improved.
+> feedback.  Feel free to [open an issue](https://github.com/brimdata/zed/issues/new)
+> or come talk to us on our [public Slack](https://www.brimsecurity.com/join-slack/)
+> about where you've seen it break or where you think it can be improved.
 
 ## Data Sources
 
-In the examples, above the data source is implied.  For example, the
+In the examples above, the data source is implied.  For example, the
 `zed query` command takes a list of files and the concatenated files
-are the implied input.  Likewise, in the Brim app, the UI selects a
-data source and key range.
+are the implied input.  Likewise, in the [Brim app](https://github.com/brimdata/brim),
+the UI provides the selection of a data source and key range.
 
 Data sources can also be explicitly specified using the `from` keyword.
-Depending on the operating context, `from` make take a file path argument
+Depending on the operating context, `from` may take a file path argument
 relative to the local file system, an HTTP URL, an S3 URL, or in the
 context of a Zed lake, the name of a data pool.
 
@@ -176,7 +183,8 @@ undefined order), merged (in a defined order) by one or more sort keys,
 or joined using relational join logic (currently only merge-based equijoin
 is supported).
 
-Generally speaking, a flowgraph defines a directed acyclic graph (DAG) composed
+Generally speaking, a [flow graph](https://en.wikipedia.org/wiki/Directed_acyclic_graph)
+defines a directed acyclic graph (DAG) composed
 of data sources and operator nodes.  The Zed syntax leverages "fat arrows",
 i.e., `=>`, to indicate the start of a parallel paths and terminates each
 parallel path with a semicolon.
@@ -188,7 +196,7 @@ from PoolOne | split (
   => op1 | op2 | ... ;
 ) | merge ts | ...
 ```
-Or multiple pools can be accessed and, for example, joined...
+Or multiple pools can be accessed and, for example, joined:
 ```
 from (
   PoolOne => op1 | op2 | ... ;
@@ -201,7 +209,7 @@ using `switch`:
 from ... | switch color (
   "red" => op1 | op2 | ... ;
   "blue" => op1 | op2 | ... ;
-  default => op1 | op2 | ...
+  default => op1 | op2 | ... ;
 ) | ...
 ```
 
@@ -211,15 +219,15 @@ Each operator is identified by name and performs a specific operation
 on a stream of records.  The entire list of operators is documented
 in the [Zed Operator Reference](operators/README.md).
 
-For three important and commonly used set of operators, the operator name
-is optional as the compiler can determine from syntax and context which operator
+For three important and commonly used operators, the operator name
+is optional, as the compiler can determine from syntax and context which operator
 is intended.  This promotes an easy-to-type, interactive UX
 for these common use cases.  They include:
-* _filter_ - selects only the records that match a specified [search expression](search-syntax/README.md)
-* _summarize_ - perform zero or more aggregations with optional group-by keys
-* _put_ - add or modify fields to records
+* `filter` - selects only the records that match a specified [search expression](search-syntax/README.md)
+* `summarize` - perform zero or more aggregations with optional group-by keys
+* `put` - add or modify fields to records
 
-For example, the canonical form of
+For example, the following query in its canonical form
 ```
 filter widget
 | summarize count() by color
@@ -230,7 +238,7 @@ can be abbreviated as
 widget | count() by color | COLOR := to_upper(color)
 ```
 as the compiler can tell from syntax and context that the three operators
-are a filter, summarize, and put.
+are a `filter`, `summarize`, and `put`.
 
 All other operators are explicitly named.
 
