@@ -1,8 +1,11 @@
-# Aggregate Functions
+# Summarize Aggregations
 
-A pipeline may contain one or more _aggregate functions_ that operate on
+The `summarize` operator performs zero or more aggregations with
+zero or more [grouping expressions](../grouping/README.md).
+Each aggregation is perform by an
+_aggregate function_ that operates on
 batches of records to carry out a running computation over the values they
-contain.
+contain.  The `summarize` keyword is optional.
 
    * [General Usage](#general-usage)
      + [Invoking](#invoking)
