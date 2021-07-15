@@ -31,7 +31,7 @@ tidy:
 SAMPLEDATA:=zed-sample-data/README.md
 
 $(SAMPLEDATA):
-	git clone --depth=1 https://github.com/brimdata/zed-sample-data $(@D)
+	git clone -b edu-data --depth=1 https://github.com/brimdata/zed-sample-data $(@D)
 
 sampledata: $(SAMPLEDATA)
 
